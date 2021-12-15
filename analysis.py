@@ -170,6 +170,7 @@ if __name__ == "__main__":
     highlights = load_highlights("data/gt", file_identifier="nalcs_w1d3_TL_FLY_g2") # nalcs_w1d3_TL_FLY_g2
 
     matches_meta = {}
+    cut = 30 * 5  # 5 sec intervals in 30 fps video, why? just because!
 
     for match in chat.keys():
         ch_match = chat[match]
@@ -179,11 +180,8 @@ if __name__ == "__main__":
         hl_lens = [e-s+1 for s, e in hl_spans]
         hl_count = len(hl_lens)
 
-        cut = 30*5  # 5 sec intervals in 30 fps video, why? just because!
         cd_message_density = message_density(ch_match, interval=cut)
         cd_message_avg_len = average_message_lengths(ch_match, interval=cut)
-
-        print(cd_message_avg_len)
 
         matches_meta[match] = {
             "highlight_spans": hl_spans,
@@ -194,7 +192,7 @@ if __name__ == "__main__":
 
     plt.plot(np.arange(len(cd_message_density)), cd_message_density / np.linalg.norm(cd_message_density), linewidth=.5)
     plt.plot(np.arange(len(cd_message_avg_len)), cd_message_avg_len / np.linalg.norm(cd_message_avg_len), linewidth=.5)
-    plt.plot(np.arange(len(hl_match[::5*30])), hl_match[::5*30]/4, linewidth=.5)
+    plt.plot(np.arange(len(hl_match[::5*30])), hl_match[::cut]/4, linewidth=.5)
     plt.show()
 
     #pprint(matches_meta)
