@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 from collections import Counter
 from scipy.stats import entropy
 import random
-from scipy.interpolate import RBFInterpolator
 """FILE LOADING"""
 
 
@@ -220,6 +219,16 @@ def moving_avg(mylist, N=5):
     return moving_aves
 
 
+def remove_missing_matches(cd, hd):
+    missing_in_hl = set(cd.keys()) - set(hd.keys())
+    missing_in_ch = set(hd.keys()) - set(cd.keys())
+    for m in missing_in_hl:
+        cd.pop(m)
+    for m in missing_in_ch:
+        hd.pop(m)
+    print("mssing match data:", set(cd.keys()) - set(hd.keys()))
+
+
 def cut_same_length(cd, hd, cut_where="end"):
     """
     Cut gold standard and chat data to same lengths. In the dataset the data has differing lengths.
@@ -291,13 +300,7 @@ if __name__ == "__main__":
     chat = load_chat("data/final_data", file_identifier=file_regex, load_random=5, random_state=42)
     highlights = load_highlights("data/gt", file_identifier=file_regex) # nalcs_w1d3_TL_FLY_g2
 
-    missing_in_hl = set(chat.keys()) - set(highlights.keys())
-    missing_in_ch = set(highlights.keys()) - set(chat.keys())
-    for m in missing_in_hl:
-        chat.pop(m)
-    for m in missing_in_ch:
-        highlights.pop(m)
-    print("mssing match data:", set(chat.keys()) - set(highlights.keys()))
+    remove_missing_matches(chat, highlights)
 
     matches_meta = {}
     data_totals = {
@@ -331,12 +334,27 @@ if __name__ == "__main__":
         cd_message_avg_len_chars = numpy.nan_to_num(average_message_lengths_chars(ch_match, interval=cut))
         cd_message_diversity = message_diversity(ch_match, interval=cut)
 
+        # scale down highlight beginning and end to fit cut for matches_meta[match]["highlights"]
+        # not quite clean but good enough
+        # hl_match[::cut]
+        # more accurate:
+        scale_factor = cd_message_density.shape[0] / hl_match.shape[0]
+        hls_scaled = np.zeros(cd_message_density.shape[0])
+        hl_spans_scaled = (np.ravel(hl_spans) * scale_factor).astype(int)
+        print(hl_spans_scaled)
+        print(cd_message_density.shape[0])
+        val = False
+        for i in range(cd_message_density.shape[0]):
+            if i in hl_spans_scaled:
+                val = not val
+            hls_scaled[i] = int(val)
+
         matches_meta[match] = {
             "highlight_spans": hl_spans,
             "highlight_lengths": hl_lens,
             "highlight_count": hl_count,
             "highlight_avg_len": sum(hl_lens)/len(hl_lens) if 0 < len(hl_lens) else 0,
-            "highlights": hl_match[::cut], # not quite clean but good enough
+            "highlights": hls_scaled, # not quite clean but good enough
             "chat_message_density": cd_message_density,
             "chat_message_avg_length": cd_message_avg_len_chars,
             "chat_message_diversity": cd_message_diversity
@@ -362,7 +380,7 @@ if __name__ == "__main__":
     data_totals["highlight_length_proportion"] = data_totals["highlight_length_secs"] / data_totals["video_length_secs"]
     data_totals["highlight_message_count_proportion"] = data_totals["chat_message_count_hl"] / data_totals["chat_message_count"]
 
-    # plot_matches(matches_meta)
+    plot_matches(matches_meta)
     pprint(data_totals)
 
     """
