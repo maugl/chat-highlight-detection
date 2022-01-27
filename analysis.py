@@ -10,6 +10,7 @@ import re
 import matplotlib.pyplot as plt
 from collections import Counter
 from scipy.stats import entropy
+from sklearn.preprocessing import MinMaxScaler
 import random
 """FILE LOADING"""
 
@@ -47,13 +48,14 @@ def load_highlights(highlight_dir, file_identifier="*"):
 """CHAT MEASURES"""
 
 
-def message_density(cd, interval=None):
-    if interval is None:
-        interval = len(cd)
+def message_density(cd, window_size=100):
     msg_counts = np.asarray(message_counts(cd))
-    steps = np.arange(len(cd))[::interval]
-    msg_density = np.add.reduceat(msg_counts, steps)
-    return msg_density
+    msg_density = list()
+    for i in range(len(cd)):
+        start_ind = max(0, int(i - window_size*0.5 / 2))
+        end_ind = min(len(msg_counts), int(i + window_size*1.5 / 2))
+        msg_density.append(msg_counts[start_ind:end_ind].sum())
+    return np.asarray(msg_density)
 
 
 def message_counts(cd):
@@ -249,18 +251,19 @@ def cut_same_length(cd, hd, cut_where="end"):
 
     return cd_cut, hd_cut
 
+
 def plot_matches(matches):
-    fig, axs = plt.subplots(len(matches.keys()))
+    fig, axs = plt.subplots(len(matches.keys()), sharex="all")
     for i, k1 in enumerate(matches.keys()):
         ax = axs[i]
         ax.title.set_text(k1)
         for k2 in matches[k1].keys():
             if k2.startswith("chat"):
                 dat = matches[k1][k2]
-                ax.plot(np.arange(len(dat)), moving_avg(dat / np.linalg.norm(dat), N=5), linewidth=.5, label=k2)
+                ax.plot(np.arange(len(dat)), moving_avg(MinMaxScaler().fit_transform(dat.reshape(-1, 1)), N=25), linewidth=.5, label=k2)
             if k2 == "highlights":
                 dat = matches[k1][k2]
-                ax.plot(np.arange(len(dat)), dat / 10, linewidth=.5, label="highlights")
+                ax.plot(np.arange(len(dat)), dat, linewidth=.5, label="highlights")
 
     handles, labels = axs[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper left')
@@ -330,34 +333,19 @@ if __name__ == "__main__":
         hl_lens = [e-s+1 for s, e in hl_spans]
         hl_count = len(hl_lens)
 
-        cd_message_density = message_density(ch_match, interval=cut)
+        cd_message_density = message_density(ch_match, window_size=300)
         cd_message_avg_len_chars = numpy.nan_to_num(average_message_lengths_chars(ch_match, interval=cut))
         cd_message_diversity = message_diversity(ch_match, interval=cut)
-
-        # scale down highlight beginning and end to fit cut for matches_meta[match]["highlights"]
-        # not quite clean but good enough
-        # hl_match[::cut]
-        # more accurate:
-        scale_factor = cd_message_density.shape[0] / hl_match.shape[0]
-        hls_scaled = np.zeros(cd_message_density.shape[0])
-        hl_spans_scaled = (np.ravel(hl_spans) * scale_factor).astype(int)
-        print(hl_spans_scaled)
-        print(cd_message_density.shape[0])
-        val = False
-        for i in range(cd_message_density.shape[0]):
-            if i in hl_spans_scaled:
-                val = not val
-            hls_scaled[i] = int(val)
 
         matches_meta[match] = {
             "highlight_spans": hl_spans,
             "highlight_lengths": hl_lens,
             "highlight_count": hl_count,
             "highlight_avg_len": sum(hl_lens)/len(hl_lens) if 0 < len(hl_lens) else 0,
-            "highlights": hls_scaled, # not quite clean but good enough
-            "chat_message_density": cd_message_density,
-            "chat_message_avg_length": cd_message_avg_len_chars,
-            "chat_message_diversity": cd_message_diversity
+            "highlights": hl_match, # not quite clean but good enough
+            "chat_message_density": cd_message_density
+            # "chat_message_avg_length": cd_message_avg_len_chars,
+            # "chat_message_diversity": cd_message_diversity
         }
 
         cd_messages_highlights, cd_messages_non_highlights = msgs_hl_non_hl(ch_match, hl_match)
