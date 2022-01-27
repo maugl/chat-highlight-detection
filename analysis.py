@@ -10,11 +10,17 @@ import re
 import matplotlib.pyplot as plt
 from collections import Counter
 from scipy.stats import entropy
+import random
+from scipy.interpolate import RBFInterpolator
 """FILE LOADING"""
 
 
-def load_chat(chat_dir, file_identifier="*"):
+def load_chat(chat_dir, file_identifier="*", load_random=None, random_state=None):
     chat_files = glob.glob("{}//{}.json".format(chat_dir, file_identifier))
+
+    if load_random:
+        random.seed(random_state)
+        chat_files = random.sample(chat_files, load_random)
 
     chat_data = dict()
 
@@ -134,23 +140,21 @@ def msgs_hl_non_hl(cd, hl):
     msgs_hl = cd[np.where(hl == 1)]
     msgs_non_hl = cd[np.where(hl == 0)]
 
-    print(msgs_hl)
-    print(msgs_non_hl)
-
     return unpack_messages(msgs_hl), unpack_messages(msgs_non_hl)
 
 
 def unpack_messages(msgs):
+    """
+    :param msgs: iterable of strings with chat messages, individual messages separated by '\n'
+    :return: unpacked messages in iterable, one string per message, no empty strings returned
+    """
     unpacked = []
     for m in msgs:
         ms = m.split("\n")
         unpacked.extend([m1 for m1 in ms if len(m1) > 0])
-
-
+    return unpacked
 
 """HIGHLIGHT STATISTICS"""
-
-
 def highlight_count(hl):
     prev = -1
     hlc = 0
@@ -283,8 +287,8 @@ if __name__ == "__main__":
     # sanity_check()
     # problem with dataset: missing highlights gold standard for nalcs_w6d3_IMT_NV_g1
 
-    file_regex = "nalcs_w1d3_TL_FLY_g*" # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
-    chat = load_chat("data/final_data", file_identifier=file_regex)
+    file_regex = "nalcs*" # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
+    chat = load_chat("data/final_data", file_identifier=file_regex, load_random=5, random_state=42)
     highlights = load_highlights("data/gt", file_identifier=file_regex) # nalcs_w1d3_TL_FLY_g2
 
     missing_in_hl = set(chat.keys()) - set(highlights.keys())
@@ -298,16 +302,15 @@ if __name__ == "__main__":
     matches_meta = {}
     data_totals = {
         "video_count": 0,  # number of videos in dataset
-        "video_length": 0,  # total length of all videos combined
+        "video_length_secs": 0,  # total length of all videos combined
         "highlight_count": 0,  # number of total highlights
-        "highlight_length": 0,  # total length of all highlights combined
+        "highlight_length_secs": 0,  # total length of all highlights combined
 
         "chat_message_count": 0, # number of total chat messages in dataset
-        "chat_message_count_avg_video": 0,
-        "chat_message_count_hl": 0,
-        "chat_message_count_non_hl": 0,
-        "chat_message_count_avg_hl": 0,
-        "chat_message_count_avg_non_hl": 0,
+        "chat_message_count_avg_video": 0, # avg number of chat messages per video
+        "chat_message_count_hl": 0, # number of total messages in all highlight segments
+        "chat_message_count_non_hl": 0, # number of total messages in all non-highlight segments
+        "chat_message_count_avg_hl": 0 # avg number of messages per highlight segment
     }
     cut = 30 * 10  # 5, 10 sec intervals in 30 fps video, why? just because!
 
@@ -332,30 +335,35 @@ if __name__ == "__main__":
             "highlight_spans": hl_spans,
             "highlight_lengths": hl_lens,
             "highlight_count": hl_count,
-            "highlight_avg_len": sum(hl_lens)/len(hl_lens),
+            "highlight_avg_len": sum(hl_lens)/len(hl_lens) if 0 < len(hl_lens) else 0,
             "highlights": hl_match[::cut], # not quite clean but good enough
             "chat_message_density": cd_message_density,
             "chat_message_avg_length": cd_message_avg_len_chars,
             "chat_message_diversity": cd_message_diversity
         }
 
-        cd_messages_highlights, cd_messages_non_highlights = msgs_hl_non_hl(ch_match, hl_match) # have to check total calculation
+        cd_messages_highlights, cd_messages_non_highlights = msgs_hl_non_hl(ch_match, hl_match)
         # how many frames of difference in length between highlight gold standard and chat data
         data_lens.append((match, len(ch_match) - len(hl_match), len(hl_spans)))
 
         # total numbers over all matches
         data_totals["video_count"] += 1
-        data_totals["video_length"] += (len(ch_match) / 30)  # video length in seconds (30fps)
+        data_totals["video_length_secs"] += round((len(ch_match) / 30), 3)  # total video length in seconds (30fps)
         data_totals["highlight_count"] += hl_count
-        data_totals["highlight_length"] += sum(hl_lens)
+        data_totals["highlight_length_secs"] += round(sum(hl_lens) / 30, 3) # total highlight length in seconds (30fps)
 
         data_totals["chat_message_count"] += sum(message_counts(ch_match))
         data_totals["chat_message_count_hl"] += len(cd_messages_highlights)
         data_totals["chat_message_count_non_hl"] += len(cd_messages_non_highlights)
 
-    plot_matches(matches_meta)
+    # aggregations over all matches / highligths
+    data_totals["chat_message_count_avg_video"] = data_totals["chat_message_count"] / data_totals["video_count"]
+    data_totals["chat_message_count_avg_hl"] = data_totals["chat_message_count"] / data_totals["highlight_count"]
+    data_totals["highlight_length_proportion"] = data_totals["highlight_length_secs"] / data_totals["video_length_secs"]
+    data_totals["highlight_message_count_proportion"] = data_totals["chat_message_count_hl"] / data_totals["chat_message_count"]
 
-    # pprint(data_totals)
+    # plot_matches(matches_meta)
+    pprint(data_totals)
 
     """
 
@@ -390,8 +398,6 @@ if __name__ == "__main__":
     plt.legend(loc="upper left")
     plt.show()
     """
-
-
 
     #pprint(matches_meta)
 
