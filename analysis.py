@@ -130,10 +130,12 @@ def emote_counts(cd):
 
 def msgs_hl_non_hl(cd, hl):
     cd = np.asarray(cd)
-    print(len(cd), len(hl))
 
     msgs_hl = cd[np.where(hl == 1)]
     msgs_non_hl = cd[np.where(hl == 0)]
+
+    print(msgs_hl)
+    print(msgs_non_hl)
 
     return unpack_messages(msgs_hl), unpack_messages(msgs_non_hl)
 
@@ -214,6 +216,26 @@ def moving_avg(mylist, N=5):
     return moving_aves
 
 
+def cut_same_length(cd, hd, cut_where="end"):
+    """
+    Cut gold standard and chat data to same lengths. In the dataset the data has differing lengths.
+    :param cd: chat data
+    :param hd: highlight (gold standard) data
+    :param cut_where: 'end': cut off the end of the shorter data, 'start': cut off beginning of shorter data
+    :return: cut chat data, cut highlight data, both to same lengths
+    """
+
+    min_len = min(len(cd), len(hd))
+
+    if cut_where == "end":
+        cd_cut = cd[:min_len]
+        hd_cut = hd[:min_len]
+    elif cut_where == "start":
+        cd_cut = cd[len(cd) - min_len:]
+        hd_cut = hd[len(hd) - min_len:]
+
+    return cd_cut, hd_cut
+
 def plot_matches(matches):
     fig, axs = plt.subplots(len(matches.keys()))
     for i, k1 in enumerate(matches.keys()):
@@ -261,7 +283,7 @@ if __name__ == "__main__":
     # sanity_check()
     # problem with dataset: missing highlights gold standard for nalcs_w6d3_IMT_NV_g1
 
-    file_regex = "*" # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
+    file_regex = "nalcs_w1d3_TL_FLY_g*" # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
     chat = load_chat("data/final_data", file_identifier=file_regex)
     highlights = load_highlights("data/gt", file_identifier=file_regex) # nalcs_w1d3_TL_FLY_g2
 
@@ -271,7 +293,7 @@ if __name__ == "__main__":
         chat.pop(m)
     for m in missing_in_ch:
         highlights.pop(m)
-    print(set(chat.keys()) - set(highlights.keys()))
+    print("mssing match data:", set(chat.keys()) - set(highlights.keys()))
 
     matches_meta = {}
     data_totals = {
@@ -287,19 +309,17 @@ if __name__ == "__main__":
         "chat_message_count_avg_hl": 0,
         "chat_message_count_avg_non_hl": 0,
     }
-    cut = 30 * 10  # 5 sec intervals in 30 fps video, why? just because!
+    cut = 30 * 10  # 5, 10 sec intervals in 30 fps video, why? just because!
 
     data_lens = []
 
     for match in chat.keys():
-        ch_match = chat[match]
-        hl_match = highlights[match]
+        ch_match, hl_match = cut_same_length(chat[match], highlights[match])
+        chat[match] = ch_match
+        highlights[match] = hl_match
 
         hl_spans = highlight_span(hl_match)
 
-        data_lens.append((match, len(ch_match) - len(hl_match), len(hl_spans)))
-
-        """
         hl_spans = highlight_span(hl_match)
         hl_lens = [e-s+1 for s, e in hl_spans]
         hl_count = len(hl_lens)
@@ -320,6 +340,8 @@ if __name__ == "__main__":
         }
 
         cd_messages_highlights, cd_messages_non_highlights = msgs_hl_non_hl(ch_match, hl_match) # have to check total calculation
+        # how many frames of difference in length between highlight gold standard and chat data
+        data_lens.append((match, len(ch_match) - len(hl_match), len(hl_spans)))
 
         # total numbers over all matches
         data_totals["video_count"] += 1
@@ -330,17 +352,24 @@ if __name__ == "__main__":
         data_totals["chat_message_count"] += sum(message_counts(ch_match))
         data_totals["chat_message_count_hl"] += len(cd_messages_highlights)
         data_totals["chat_message_count_non_hl"] += len(cd_messages_non_highlights)
-        """
 
-    # plot_matches(matches_meta)
+    plot_matches(matches_meta)
 
     # pprint(data_totals)
 
+    """
+
+    # show where there is a frame number discrepancy between highlight annotation and chat data
     pprint(sorted(data_lens, key=itemgetter(1)))
-    abs_missing_frames = [abs(d[1]) for d in data_lens]
+    abs_missing_frames = [d[1] for d in data_lens]
     num_highlights = [d[2] for d in data_lens]
-    plt.scatter(abs_missing_frames, num_highlights)
+    color_NALCS_LMS = ["r" if d[0].startswith("nalcs") else "b" for d in data_lens]
+    plt.scatter(abs_missing_frames, num_highlights, c=color_NALCS_LMS)
+    plt.title("differing length of highlight annotation and chat data, red: nalcs, blue:lms")
+    plt.xlabel("number of missing frames (neg: more gold frame, pos: more chat frames)")
+    plt.ylabel("number of highlights in match")
     plt.show()
+    """
 
     """
     for k1 in matches_meta.keys():
