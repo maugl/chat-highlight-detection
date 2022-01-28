@@ -46,12 +46,10 @@ def load_highlights(highlight_dir, file_identifier="*"):
 
 
 """CHAT MEASURES"""
-
-
 def message_density(cd, window_size=100, step_size=1):
     msg_counts = np.asarray(message_counts(cd))
     msg_density = list()
-    for i in range(len(cd)):
+    for i in range(0, len(cd), step_size):
         start_ind = max(0, int(i - window_size*0.5 / 2))
         end_ind = min(len(msg_counts), int(i + window_size*1.5 / 2))
         msg_density.append(msg_counts[start_ind:end_ind].sum())
@@ -154,6 +152,7 @@ def unpack_messages(msgs):
         ms = m.split("\n")
         unpacked.extend([m1 for m1 in ms if len(m1) > 0])
     return unpacked
+
 
 """HIGHLIGHT STATISTICS"""
 def highlight_count(hl):
@@ -301,7 +300,7 @@ if __name__ == "__main__":
     # problem with dataset: missing highlights gold standard for nalcs_w6d3_IMT_NV_g1
 
     file_regex = "nalcs*" # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
-    chat = load_chat("data/final_data", file_identifier=file_regex, load_random=2, random_state=42)
+    chat = load_chat("data/final_data", file_identifier=file_regex, load_random=None, random_state=None)
     highlights = load_highlights("data/gt", file_identifier=file_regex) # nalcs_w1d3_TL_FLY_g2
 
     remove_missing_matches(chat, highlights)
@@ -365,7 +364,7 @@ if __name__ == "__main__":
 
     # aggregations over all matches / highligths
     data_totals["chat_message_count_avg_video"] = data_totals["chat_message_count"] / data_totals["video_count"]
-    data_totals["chat_message_count_avg_hl"] = data_totals["chat_message_count"] / data_totals["highlight_count"]
+    data_totals["chat_message_count_avg_hl"] = data_totals["chat_message_count_hl"] / data_totals["highlight_count"]
     data_totals["highlight_length_proportion"] = data_totals["highlight_length_secs"] / data_totals["video_length_secs"]
     data_totals["highlight_message_count_proportion"] = data_totals["chat_message_count_hl"] / data_totals["chat_message_count"]
 

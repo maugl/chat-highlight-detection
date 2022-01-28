@@ -50,7 +50,7 @@ if __name__ == "__main__":
         # print(highlight_spans_p20)
         hl_spans.append(highlight_spans)
 
-        cd_message_density_smooth = analysis.moving_avg(analysis.message_density(ch_match, window_size=300), N=1500)
+        cd_message_density_smooth = analysis.moving_avg(analysis.message_density(ch_match, window_size=300, step_size=300), N=1500)
         density_data.append(cd_message_density_smooth)
         interpolations.append(interpolate(cd_message_density_smooth, window_size=100))
     # flatten
