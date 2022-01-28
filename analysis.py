@@ -58,13 +58,11 @@ def message_density(cd, window_size=100, step_size=1):
 
 def message_counts(cd):
     msg_cnts = list()
-    # individual chat messages are delimited by new line
-    count_re = re.compile("\n")
     for frame in cd:
         if frame == "":
             msg_cnts.append(0)
         else:
-            msg_cnts.append(len(count_re.findall(frame)))
+            msg_cnts.append(len(unpack_messages([frame])))
     return msg_cnts
 
 
@@ -142,13 +140,13 @@ def msgs_hl_non_hl(cd, hl):
     return unpack_messages(msgs_hl), unpack_messages(msgs_non_hl)
 
 
-def unpack_messages(msgs):
+def unpack_messages(cd):
     """
     :param msgs: iterable of strings with chat messages, individual messages separated by '\n'
     :return: unpacked messages in iterable, one string per message, no empty strings returned
     """
     unpacked = []
-    for m in msgs:
+    for m in cd:
         ms = m.split("\n")
         unpacked.extend([m1 for m1 in ms if len(m1) > 0])
     return unpacked
@@ -299,7 +297,7 @@ if __name__ == "__main__":
     # sanity_check()
     # problem with dataset: missing highlights gold standard for nalcs_w6d3_IMT_NV_g1
 
-    file_regex = "nalcs_w1d3_TL_FLY_g*" # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
+    file_regex = "nalcs*" # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
     chat = load_chat("data/final_data", file_identifier=file_regex, load_random=None, random_state=None)
     highlights = load_highlights("data/gt", file_identifier=file_regex) # nalcs_w1d3_TL_FLY_g2
 
