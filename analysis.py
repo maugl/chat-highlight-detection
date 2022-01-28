@@ -48,7 +48,7 @@ def load_highlights(highlight_dir, file_identifier="*"):
 """CHAT MEASURES"""
 
 
-def message_density(cd, window_size=100):
+def message_density(cd, window_size=100, step_size=1):
     msg_counts = np.asarray(message_counts(cd))
     msg_density = list()
     for i in range(len(cd)):
@@ -218,7 +218,7 @@ def moving_avg(mylist, N=5):
         tmp.extend(moving_aves)
         moving_aves = tmp
 
-    return moving_aves
+    return np.asarray(moving_aves)
 
 
 def remove_missing_matches(cd, hd):
@@ -254,13 +254,14 @@ def cut_same_length(cd, hd, cut_where="end"):
 
 def plot_matches(matches):
     fig, axs = plt.subplots(len(matches.keys()), sharex="all")
-    for i, k1 in enumerate(matches.keys()):
+    for i, k1 in enumerate(matches.keys()): # fails if only one match is selected
         ax = axs[i]
         ax.title.set_text(k1)
         for k2 in matches[k1].keys():
             if k2.startswith("chat"):
                 dat = matches[k1][k2]
-                ax.plot(np.arange(len(dat)), moving_avg(MinMaxScaler().fit_transform(dat.reshape(-1, 1)), N=25), linewidth=.5, label=k2)
+                ax.plot(np.arange(len(dat)), moving_avg(MinMaxScaler().fit_transform(dat.reshape(-1, 1)), N=1500), linewidth=.5, label=k2)
+                ax.plot(np.arange(len(dat)), MinMaxScaler().fit_transform(dat.reshape(-1, 1)), linewidth=.5, label=f"{k2} no smoothing")
             if k2 == "highlights":
                 dat = matches[k1][k2]
                 ax.plot(np.arange(len(dat)), dat, linewidth=.5, label="highlights")
@@ -300,7 +301,7 @@ if __name__ == "__main__":
     # problem with dataset: missing highlights gold standard for nalcs_w6d3_IMT_NV_g1
 
     file_regex = "nalcs*" # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
-    chat = load_chat("data/final_data", file_identifier=file_regex, load_random=5, random_state=42)
+    chat = load_chat("data/final_data", file_identifier=file_regex, load_random=2, random_state=42)
     highlights = load_highlights("data/gt", file_identifier=file_regex) # nalcs_w1d3_TL_FLY_g2
 
     remove_missing_matches(chat, highlights)
@@ -333,7 +334,7 @@ if __name__ == "__main__":
         hl_lens = [e-s+1 for s, e in hl_spans]
         hl_count = len(hl_lens)
 
-        cd_message_density = message_density(ch_match, window_size=300)
+        cd_message_density = message_density(ch_match, window_size=300) # this is calculated differently than avg_len and diversity
         cd_message_avg_len_chars = numpy.nan_to_num(average_message_lengths_chars(ch_match, interval=cut))
         cd_message_diversity = message_diversity(ch_match, interval=cut)
 
@@ -368,7 +369,7 @@ if __name__ == "__main__":
     data_totals["highlight_length_proportion"] = data_totals["highlight_length_secs"] / data_totals["video_length_secs"]
     data_totals["highlight_message_count_proportion"] = data_totals["chat_message_count_hl"] / data_totals["chat_message_count"]
 
-    plot_matches(matches_meta)
+    # plot_matches(matches_meta)
     pprint(data_totals)
 
     """

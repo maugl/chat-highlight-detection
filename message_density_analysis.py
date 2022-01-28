@@ -1,15 +1,26 @@
+from pprint import pprint
+
 import numpy as np
 
 import analysis
 from scipy.interpolate import krogh_interpolate
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
 
 
-def interpolate(series):
+def interpolate(series, window_size=100):
     # assuming 1D series
-    steps = range(len(series))
-    f = krogh_interpolate(steps, series, steps[::5], der=2)
-    return f
+
+    inter_result = np.array([])
+    for i in range(10000, int(len(series))):
+        start_ind = max(0, int(i - window_size * 0.5 / 2))
+        end_ind = min(len(series), int(i + window_size * 1.5 / 2))
+        x = np.arange(start_ind, end_ind)
+        y = series[start_ind:end_ind]
+        print(y)
+        print(krogh_interpolate(x, y, x+0.5, der=1))
+        inter_result = np.append(inter_result, krogh_interpolate(x, y, x+0.5, der=1), axis=0)
+    return np.asarray(inter_result)
 
 
 if __name__ == "__main__":
@@ -35,21 +46,21 @@ if __name__ == "__main__":
         highlight_spans = analysis.highlight_span(hl_match)
         print(highlight_spans)
         # examine 20% of highlight length before and after
-        highlight_spans_p20 = [(int(b-(e-b)*0.2), int(e+(e-b)*0.2)) for b, e in highlight_spans]
-        print(highlight_spans_p20)
-        hl_spans.append(highlight_spans_p20)
+        # highlight_spans_p20 = [(int(b-(e-b)*0.2), int(e+(e-b)*0.2)) for b, e in highlight_spans]
+        # print(highlight_spans_p20)
+        hl_spans.append(highlight_spans)
 
-        cd_message_density_smooth = analysis.moving_avg(analysis.message_density(ch_match, interval=cut))
+        cd_message_density_smooth = analysis.moving_avg(analysis.message_density(ch_match, window_size=300), N=1500)
         density_data.append(cd_message_density_smooth)
-        # interpolations.append(interpolate(cd_message_density_smooth))
+        interpolations.append(interpolate(cd_message_density_smooth, window_size=100))
     # flatten
     hls = np.ravel(hl_spans)
 
-    factor = len(density_data[0])/len(highlights[matches[0]])
-
     time_steps = range(len(density_data[0]))
-    print(factor)
-    plt.plot(time_steps, density_data[0])
-    plt.plot(highlights[matches[0]][::actual_cut])
-    plt.scatter(hls*factor, np.ones(hls.shape[0]))
+
+    print(interpolations[0])
+
+    plt.plot(time_steps, MinMaxScaler().fit_transform(density_data[0].reshape(-1,1)))
+    plt.plot(highlights[matches[0]])
+    plt.scatter(hl_spans[0], np.ones(hls.shape[0]))
     plt.show()
