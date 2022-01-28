@@ -299,7 +299,7 @@ if __name__ == "__main__":
     # sanity_check()
     # problem with dataset: missing highlights gold standard for nalcs_w6d3_IMT_NV_g1
 
-    file_regex = "nalcs*" # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
+    file_regex = "nalcs_w1d3_TL_FLY_g*" # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
     chat = load_chat("data/final_data", file_identifier=file_regex, load_random=None, random_state=None)
     highlights = load_highlights("data/gt", file_identifier=file_regex) # nalcs_w1d3_TL_FLY_g2
 
@@ -354,9 +354,9 @@ if __name__ == "__main__":
 
         # total numbers over all matches
         data_totals["video_count"] += 1
-        data_totals["video_length_secs"] += round((len(ch_match) / 30), 3)  # total video length in seconds (30fps)
+        data_totals["video_length_secs"] += len(ch_match) / 30  # total video length in seconds (30fps)
         data_totals["highlight_count"] += hl_count
-        data_totals["highlight_length_secs"] += round(sum(hl_lens) / 30, 3) # total highlight length in seconds (30fps)
+        data_totals["highlight_length_secs"] += sum(hl_lens) / 30  # total highlight length in seconds (30fps)
 
         data_totals["chat_message_count"] += sum(message_counts(ch_match))
         data_totals["chat_message_count_hl"] += len(cd_messages_highlights)
@@ -368,7 +368,7 @@ if __name__ == "__main__":
     data_totals["highlight_length_proportion"] = data_totals["highlight_length_secs"] / data_totals["video_length_secs"]
     data_totals["highlight_message_count_proportion"] = data_totals["chat_message_count_hl"] / data_totals["chat_message_count"]
 
-    # plot_matches(matches_meta)
+    plot_matches(matches_meta)
     pprint(data_totals)
 
     """
