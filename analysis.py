@@ -1,4 +1,3 @@
-from operator import itemgetter
 from pprint import pprint
 
 import numpy
@@ -43,6 +42,17 @@ def load_highlights(highlight_dir, file_identifier="*"):
             highlight_data[match_name] = numpy.load(file_name, allow_pickle=False)
 
     return highlight_data
+
+
+def load_emotes(data_dir, file_identifier="*.txt"):
+    emote_files = glob.glob("{}//{}.txt".format(data_dir, file_identifier.replace(".txt", "")))
+    emotes = set()
+    for file_name in emote_files:
+        with open(file_name, "r") as in_file:
+            for line in in_file.readlines():
+                emotes.add(line.strip("\n"))
+
+    return emotes
 
 
 """CHAT MEASURES"""
@@ -119,16 +129,38 @@ def normalized_entropy(probs):
         return 0
 
 
-def emote_density(cd, interval):
-    # not quite sure how to implement yet
-    # maybe simple lexicon of a few emotes, maybe from emote embedding from song2021
-    pass
+def emote_density(cd, emotes, window_size=100, step_size=1):
+    """
+
+    :param cd: chat data, list of frame-wise concatenated chats
+    :param emotes: set of emotes to compare against
+    :param window_size:
+    :param step_size:
+    :return:
+    """
+    emote_cnts = emote_counts(cd, emotes)
+    msg_density = list()
+    for i in range(0, len(cd), step_size):
+        start_ind = max(0, int(i - window_size * 0.5 / 2))
+        end_ind = min(len(emote_cnts), int(i + window_size * 1.5 / 2))
+        msg_density.append(emote_cnts[start_ind:end_ind].sum())
+    return np.asarray(msg_density)
 
 
-def emote_counts(cd):
-    # not quite sure how to implement yet
-    # emote_re = re.compile("\b\w+[\W|\w]+\b")
-    pass
+def emote_counts(cd, emotes):
+    """
+    Count emotes per frame
+    :param cd: chat data, list of frame-wise concatenated chats
+    :param emotes: set of emotes to compare against
+    :return:
+    """
+    emote_cnts = list()
+    for frame in cd:
+        if frame == "":
+            emote_cnts.append(0)
+        else:
+            emote_cnts.append(sum([tok in emotes for tok in tokenize("\n".join(unpack_messages([frame])))]))
+    return np.asarray(emote_cnts)
 
 
 def msgs_hl_non_hl(cd, hl):
@@ -142,7 +174,7 @@ def msgs_hl_non_hl(cd, hl):
 
 def unpack_messages(cd):
     """
-    :param msgs: iterable of strings with chat messages, individual messages separated by '\n'
+    :param cd: iterable of strings with chat messages, individual messages separated by '\n'
     :return: unpacked messages in iterable, one string per message, no empty strings returned
     """
     unpacked = []
@@ -221,11 +253,15 @@ def moving_avg(mylist, N=5):
 def remove_missing_matches(cd, hd):
     missing_in_hl = set(cd.keys()) - set(hd.keys())
     missing_in_ch = set(hd.keys()) - set(cd.keys())
+
+    print("missing in highlights:\t", missing_in_hl)
+    print("missing in chat:\t", missing_in_ch)
+
     for m in missing_in_hl:
         cd.pop(m)
     for m in missing_in_ch:
         hd.pop(m)
-    print("mssing match data:", set(cd.keys()) - set(hd.keys()))
+    assert len(set(cd.keys()) - set(hd.keys())) == 0 # double check
 
 
 def cut_same_length(cd, hd, cut_where="end"):
@@ -298,8 +334,13 @@ if __name__ == "__main__":
     # problem with dataset: missing highlights gold standard for nalcs_w6d3_IMT_NV_g1
 
     file_regex = "nalcs*" # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
-    chat = load_chat("data/final_data", file_identifier=file_regex, load_random=None, random_state=None)
+    chat = load_chat("data/final_data", file_identifier=file_regex, load_random=2, random_state=42)
     highlights = load_highlights("data/gt", file_identifier=file_regex) # nalcs_w1d3_TL_FLY_g2
+    emotes = load_emotes("data/emotes", "*_emotes.txt")
+
+    print(len(chat))
+    print(len(highlights))
+    print(len(emotes))
 
     remove_missing_matches(chat, highlights)
 
@@ -332,8 +373,9 @@ if __name__ == "__main__":
         hl_count = len(hl_lens)
 
         cd_message_density = message_density(ch_match, window_size=300) # this is calculated differently than avg_len and diversity
-        cd_message_avg_len_chars = numpy.nan_to_num(average_message_lengths_chars(ch_match, interval=cut))
-        cd_message_diversity = message_diversity(ch_match, interval=cut)
+        # cd_message_avg_len_chars = numpy.nan_to_num(average_message_lengths_chars(ch_match, interval=cut))
+        # cd_message_diversity = message_diversity(ch_match, interval=cut)
+        cd_emote_density = emote_density(ch_match, emotes, window_size=300)
 
         matches_meta[match] = {
             "highlight_spans": hl_spans,
@@ -341,9 +383,10 @@ if __name__ == "__main__":
             "highlight_count": hl_count,
             "highlight_avg_len": sum(hl_lens)/len(hl_lens) if 0 < len(hl_lens) else 0,
             "highlights": hl_match, # not quite clean but good enough
-            "chat_message_density": cd_message_density
+            "chat_message_density": cd_message_density,
             # "chat_message_avg_length": cd_message_avg_len_chars,
             # "chat_message_diversity": cd_message_diversity
+            "chat_emote_density": cd_emote_density
         }
 
         cd_messages_highlights, cd_messages_non_highlights = msgs_hl_non_hl(ch_match, hl_match)

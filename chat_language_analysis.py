@@ -33,6 +33,8 @@ if __name__ == "__main__":
     file_regex = "nalcs*"  # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
     chat = analysis.load_chat("data/final_data", file_identifier=file_regex)
     highlights = analysis.load_highlights("data/gt", file_identifier=file_regex)  # nalcs_w1d3_TL_FLY_g2
+    emotes = {em.lower() for em in analysis.load_emotes("data/emotes", "*_emotes.txt")}
+
     analysis.remove_missing_matches(chat, highlights)
 
     tokens = list()
@@ -84,7 +86,10 @@ if __name__ == "__main__":
     df["total_top_tok"] = [e[0] for e in tt_total_all]
     df["total_top_tok_cnts"] = [e[1] for e in tt_total_all]
 
-    # df.to_csv("data/analysis/tokenCountsNoStopWords.csv")
+    df["total_top_emotes"] = [e[0] for e in token_freq_total.most_common(n=len(token_freq_total)-1) if e[0] in emotes][:1000]
+    df["total_top_emotes_cnts"] = [e[1] for e in token_freq_total.most_common(n=len(token_freq_total)-1) if e[0] in emotes][:1000]
+
+    df.to_csv("data/analysis/tokenCountsNoStopWordsPlusEmotes.csv")
     print(df.head())
 
 
