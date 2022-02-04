@@ -184,6 +184,52 @@ def unpack_messages(cd):
     return unpacked
 
 
+def copypasta_density(cd, window_size=100, step_size=1, n_gram_length=3, threshold=30):
+    """
+    finds copypasta in twitch chat messages
+    :param threshold: threshold for how many occurences of one ngram is considered to be copypasta
+    :param cd: tokenized chat messages
+    :param window_size:
+    :param step_size:
+    :param n_gram_length: number of n_grams to be checked
+    :return: index of copy pasta messages
+    """
+    ngl = n_gram_length
+
+    n_gram_counts = Counter()
+    ct_ngrams = list()
+    # first pass: count n_grams_total
+    for frame in cd:
+        if frame == "":
+            ct_ngrams.append("")
+            pass
+        else:
+            tks = tokenize("\n".join(unpack_messages([frame])))
+            # n-gram generation
+            ngrams = list(zip(*[([""] * ngl + tks + [""] * ngl)[i:-ngl + i] for i in range(ngl)]))
+            ct_ngrams.append(ngrams)
+            ngc = Counter(ngrams)
+            n_gram_counts.update(ngc)
+
+    # second pass count copy pasta n_grams per frame
+    # maybe remove that if we can keep a reference to the Counter value determined above
+    n_gram_indices = list()
+    for frame in ct_ngrams:
+        if frame == "":
+            n_gram_indices.append(0)
+        else:
+            n_gram_indices.append(sum([n_gram_counts[n_gram] if n_gram_counts[n_gram] >= threshold else 0 for n_gram in frame]))
+
+    n_gram_indices = np.asarray(n_gram_indices)
+    cp_density = list()
+    for i in range(0, len(cd), step_size):
+        start_ind = max(0, int(i - window_size * 0.5 / 2))
+        end_ind = min(len(n_gram_indices), int(i + window_size * 1.5 / 2))
+        cp_density.append(n_gram_indices[start_ind:end_ind].sum())
+    # possibly add decay if copy pasting was done further away (in terms of number of messages in between)
+    return np.asarray(cp_density)
+
+
 """HIGHLIGHT STATISTICS"""
 def highlight_count(hl):
     prev = -1
@@ -294,7 +340,7 @@ def plot_matches(matches):
             if k2.startswith("chat"):
                 dat = matches[k1][k2]
                 ax.plot(np.arange(len(dat)), moving_avg(MinMaxScaler().fit_transform(dat.reshape(-1, 1)), N=1500), linewidth=.5, label=k2)
-                ax.plot(np.arange(len(dat)), MinMaxScaler().fit_transform(dat.reshape(-1, 1)), linewidth=.5, label=f"{k2} no smoothing")
+                # ax.plot(np.arange(len(dat)), MinMaxScaler().fit_transform(dat.reshape(-1, 1)), linewidth=.5, label=f"{k2} no smoothing")
             if k2 == "highlights":
                 dat = matches[k1][k2]
                 ax.plot(np.arange(len(dat)), dat, linewidth=.5, label="highlights")
@@ -334,7 +380,7 @@ if __name__ == "__main__":
     # problem with dataset: missing highlights gold standard for nalcs_w6d3_IMT_NV_g1
 
     file_regex = "nalcs*" # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
-    chat = load_chat("data/final_data", file_identifier=file_regex, load_random=2, random_state=42)
+    chat = load_chat("data/final_data", file_identifier=file_regex, load_random=3)
     highlights = load_highlights("data/gt", file_identifier=file_regex) # nalcs_w1d3_TL_FLY_g2
     emotes = load_emotes("data/emotes", "*_emotes.txt")
 
@@ -376,6 +422,7 @@ if __name__ == "__main__":
         # cd_message_avg_len_chars = numpy.nan_to_num(average_message_lengths_chars(ch_match, interval=cut))
         # cd_message_diversity = message_diversity(ch_match, interval=cut)
         cd_emote_density = emote_density(ch_match, emotes, window_size=300)
+        cd_copypasta_density = copypasta_density(ch_match, window_size=300, threshold=20, n_gram_length=5)
 
         matches_meta[match] = {
             "highlight_spans": hl_spans,
@@ -386,7 +433,8 @@ if __name__ == "__main__":
             "chat_message_density": cd_message_density,
             # "chat_message_avg_length": cd_message_avg_len_chars,
             # "chat_message_diversity": cd_message_diversity
-            "chat_emote_density": cd_emote_density
+            "chat_emote_density": cd_emote_density,
+            "chat_copypasta_density": cd_copypasta_density
         }
 
         cd_messages_highlights, cd_messages_non_highlights = msgs_hl_non_hl(ch_match, hl_match)
