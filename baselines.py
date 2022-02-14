@@ -181,7 +181,7 @@ if __name__ == "__main__":
 
     # load data
     files = "nalcs*g[13]"  # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
-    matches = load_experiments_data(files, load_random=None, random_state=None-he, data_path=args.data_path)
+    matches = load_experiments_data(files, load_random=None, random_state=None, data_path=args.data_path)
 
     with open(args.config_file, "r") as in_file:
         baseline_params = json.load(in_file)
