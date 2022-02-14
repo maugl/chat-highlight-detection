@@ -4,7 +4,7 @@ import numpy
 import numpy as np
 import json
 import glob
-from moviepy.editor import VideoFileClip
+# from moviepy.editor import VideoFileClip
 import re
 import matplotlib.pyplot as plt
 from collections import Counter
@@ -365,7 +365,7 @@ def sanity_check():
     # check that video has same number of frames as chat and highlights
     print("items in chat:", len(chat[list(chat.keys())[0]]))
     print("items in highlights: ", highlights[list(highlights.keys())[0]].shape[0])
-    clip = VideoFileClip("data/videos/nalcs_w1d3_TL_FLY_g2.mp4")
+    # clip = VideoFileClip("data/videos/nalcs_w1d3_TL_FLY_g2.mp4")
     print("frames in video: ", clip.reader.nframes)
     print("framerate: ", clip.fps)
     # inspect some data
