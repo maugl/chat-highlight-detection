@@ -1,13 +1,14 @@
 from pprint import pprint
 
 import numpy as np
+from matplotlib import pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 
 from analysis import load_chat, load_highlights, remove_missing_matches, cut_same_length, message_density, \
     highlight_span, plot_matches, moving_avg
 
 
-class real_time_peak_detection():
+class RealTimePeakPredictor():
     """
     theory:
     https://stackoverflow.com/a/22640362
@@ -16,7 +17,8 @@ class real_time_peak_detection():
     https://stackoverflow.com/a/56451135
     Spike detection algorithm
     """
-    def __init__(self, array, lag, threshold, influence):
+    def __init__(self, array, lag, threshold, influence, scaler=MinMaxScaler, smoothing=moving_avg,
+                 smoothing_strength=1500):
         """
 
         :param array: prime algorithm with some data points
@@ -37,6 +39,8 @@ class real_time_peak_detection():
         self.stdFilter = [0] * len(self.y)
         self.avgFilter[self.lag - 1] = np.mean(self.y[0:self.lag]).tolist()
         self.stdFilter[self.lag - 1] = np.std(self.y[0:self.lag]).tolist()
+
+        self.fitted = False
 
     def thresholding_algo(self, new_value):
         self.y.append(new_value)
@@ -75,12 +79,26 @@ class real_time_peak_detection():
 
         return self.signals[i]
 
+    def fit(self, x):
+        # x_scaled = self.
+        for data_point in x:
+            self.thresholding_algo(data_point)
+        self.fitted = True
+
+    def predict(self):
+        if not self.fitted:
+            return None  # or raise error
+        return self.signals
+
 
 class SpikePredictorScipy:
     def __init__(self):
         pass
 
-    def predict_Spike(self):
+    def fit(self):
+        pass
+
+    def predict(self):
         pass
 
 
@@ -122,11 +140,13 @@ if __name__ == "__main__":
         data_totals["video_length_secs"] += len(ch_match) / 30  # total video length in seconds (30fps)
         data_totals["highlight_count"] += hl_count
 
+    lag = 1500
     for name, m in matches_meta.items():
         cmd_smoothed = moving_avg(MinMaxScaler().fit_transform(m["chat_message_density"].reshape(-1, 1)), N=1500)
-        rtpd = real_time_peak_detection(array=cmd_smoothed[:300], lag=300, threshold=5, influence=0)
-        for dat_point in cmd_smoothed[300:]:
+
+        rtpd = RealTimePeakPredictor(array=cmd_smoothed[:lag], lag=lag, threshold=3, influence=0)
+        for dat_point in cmd_smoothed[lag:]:
             rtpd.thresholding_algo(dat_point)
         m["pred_md_spikes"] = np.asarray(rtpd.signals)
-        print(name)
+
     plot_matches(matches_meta)
