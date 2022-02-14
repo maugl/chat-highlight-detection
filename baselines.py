@@ -1,3 +1,5 @@
+import parser
+from argparse import ArgumentParser
 from pprint import pprint
 
 import numpy as np
@@ -80,7 +82,8 @@ class RealTimePeakPredictor():
         return self.signals[i]
 
     def fit(self, x):
-        # x_scaled = self.
+        if x is np.ndarray:
+            x = x.tolist()
         for data_point in x:
             self.thresholding_algo(data_point)
         self.fitted = True
@@ -91,11 +94,26 @@ class RealTimePeakPredictor():
         return self.signals
 
 
-if __name__ == "__main__":
-    # load data
-    file_regex = "nalcs*" # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
-    chat = load_chat("data/final_data", file_identifier=file_regex, load_random=3, random_state=42)
-    highlights = load_highlights("data/gt", file_identifier=file_regex) # nalcs_w1d3_TL_FLY_g2
+class ScipyPeaks:
+    def __init__(self, shift=False, scipy_params=None):
+        self.peaks = None
+        self.props = None
+        self.shift = shift # TODO implement shift for peaks
+        self.params = scipy_params
+
+    def predict(self, x):
+        self.peaks, self.props = find_peaks(x, **self.params)
+        # TODO width can be made more elaborate by adding more information about the peaks to the calculation
+        width_inds = np.asarray([i for p, w in zip(self.peaks, self.props["widths"]) for i in
+                                 range(np.int(p - w / 2), np.int(p + w / 2))]).ravel()
+        speaks = np.zeros(len(x))
+        speaks[width_inds] = 1
+        return speaks
+
+
+def load_experiments_data(file_regex, load_random, random_state, data_path="data"):
+    chat = load_chat(f"{data_path}/final_data", file_identifier=file_regex, load_random=load_random, random_state=random_state)
+    highlights = load_highlights(f"{data_path}/gt", file_identifier=file_regex)  # nalcs_w1d3_TL_FLY_g2
     remove_missing_matches(chat, highlights)
     matches_meta = {}
     data_totals = {
@@ -113,40 +131,59 @@ if __name__ == "__main__":
         cd_message_density = message_density(ch_match, window_size=300)
 
         hl_spans = highlight_span(hl_match)
-        hl_lens = [e-s+1 for s, e in hl_spans]
+        hl_lens = [e - s + 1 for s, e in hl_spans]
         hl_count = len(hl_lens)
-
 
         matches_meta[match] = {
             "highlight_spans": hl_spans,
             "highlight_lengths": hl_lens,
             "highlight_count": hl_count,
             "highlights": hl_match,
-            "chat_message_density": cd_message_density  # TODO scale, normalize
+            "chat_message_density": cd_message_density,
+            "cd_message_density_smoothed": moving_avg(MinMaxScaler().fit_transform(cd_message_density.reshape(-1, 1)),
+                                                      N=1500)
         }
 
         data_totals["video_count"] += 1
         data_totals["video_length_secs"] += len(ch_match) / 30  # total video length in seconds (30fps)
         data_totals["highlight_count"] += hl_count
 
-    lag = 750
-    for name, m in matches_meta.items():
-        cmd_smoothed = moving_avg(MinMaxScaler().fit_transform(m["chat_message_density"].reshape(-1, 1)), N=1500).tolist()
-        """
-        rtpd = RealTimePeakPredictor(array=cmd_smoothed[:lag], lag=lag, threshold=3, influence=0.9)
-        for dat_point in cmd_smoothed[lag:]:
-            rtpd.thresholding_algo(dat_point)
-        m["pred_md_spikes"] = np.asarray(rtpd.signals)
-        """
+    return matches_meta
 
-        scipy_peaks, peak_props = find_peaks(cmd_smoothed, height=None, threshold=None, distance=None, prominence=[0.1], width=(1000,5000), wlen=None,
-                rel_height=0.5, plateau_size=None)
-        width_inds = np.asarray([i for p, w in zip(scipy_peaks, peak_props["widths"]) for i in range(np.int(p-w/2), np.int(p+w/2))]).ravel()
 
-        print(width_inds)
-        speaks = np.zeros(len(cmd_smoothed))
-        speaks[scipy_peaks] = 1
-        speaks[width_inds] = 1
-        m["pred_scipy_peaks"] = speaks
+if __name__ == "__main__":
+    parser = ArgumentParser(description="tune, run, evaluate baseline classfiers for highlight prediction on chat"
+                                        "messages")
+    parser.add_argument("-p", "--data_path", help="path to the data directory")
+    parser.add_argument("-b", "--baseline", choices=["rtpp", "spp"], help="which baseline to run.\n\trtpp:\treal time"
+                                                                          "peak predictor\n\tspp: scipy's find peaks")
+    parser.add_argument("-c", "--config_file", help="path to the config file for the baseline parameter values")
 
-    plot_matches(matches_meta)
+    args = parser.parse_args()
+
+    # load data
+    files = "nalcs*"  # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
+    matches = load_experiments_data(files, load_random=3, random_state=42)
+
+    if args["baseline"] == "rtpp"
+        lag = 750
+        for name, m in matches.items():
+            rtpp = RealTimePeakPredictor(array=m["cd_message_density_smoothed"][:lag], lag=lag, threshold=3,
+                                         influence=0.9)
+            rtpp.fit(m["cd_message_density_smoothed"][lag:])
+            m["pred_md_spikes"] = rtpp.predict()
+
+    if args["baseline"] == "spp":
+        peaks_params = {
+            "height": None,
+            "threshold": None,
+            "distance": None,
+            "prominence": [0.1],
+            "width": (1000, 5000),
+            "wlen": None,
+            "rel_height": 0.5,
+            "plateau_size": None
+        }
+
+        spp = ScipyPeaks(scipy_params=peaks_params)
+        m["pred_scipy_peaks"] = spp.predict(m["cd_message_density_smoothed"])
