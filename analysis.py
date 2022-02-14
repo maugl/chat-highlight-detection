@@ -256,6 +256,11 @@ def highlight_length(hl):
 
 
 def highlight_span(hl):
+    """
+    extracts beginning and end indices for each highlight in hl
+    :param hl: iterable of 0 for non-hihglight frame and 1 for highlight frame
+    :return: tuples of indices over all frames in hl where highlights are found
+    """
     hls = list()
 
     prev = -1
@@ -341,9 +346,9 @@ def plot_matches(matches):
                 dat = matches[k1][k2]
                 ax.plot(np.arange(len(dat)), moving_avg(MinMaxScaler().fit_transform(dat.reshape(-1, 1)), N=1500), linewidth=.5, label=k2)
                 # ax.plot(np.arange(len(dat)), MinMaxScaler().fit_transform(dat.reshape(-1, 1)), linewidth=.5, label=f"{k2} no smoothing")
-            if k2 == "highlights":
+            if k2 == "highlights" or k2.startswith("pred"):
                 dat = matches[k1][k2]
-                ax.plot(np.arange(len(dat)), dat, linewidth=.5, label="highlights")
+                ax.plot(np.arange(len(dat)), dat, linewidth=.5, label=k2)
 
     handles, labels = axs[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper left')
@@ -376,6 +381,8 @@ def sanity_check():
 
 
 if __name__ == "__main__":
+    # TODO put the whole loading and calculation loop into function with parameters for which measures to output
+
     # sanity_check()
     # problem with dataset: missing highlights gold standard for nalcs_w6d3_IMT_NV_g1
 
@@ -412,7 +419,7 @@ if __name__ == "__main__":
         chat[match] = ch_match
         highlights[match] = hl_match
 
-        hl_spans = highlight_span(hl_match)
+        # hl_spans = highlight_span(hl_match)
 
         hl_spans = highlight_span(hl_match)
         hl_lens = [e-s+1 for s, e in hl_spans]
