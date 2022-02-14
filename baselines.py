@@ -1,6 +1,6 @@
-import parser
+import json
 from argparse import ArgumentParser
-from pprint import pprint
+from sklearn.model_selection import ParameterGrid
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -20,8 +20,7 @@ class RealTimePeakPredictor():
     https://stackoverflow.com/a/56451135
     Spike detection algorithm
     """
-    def __init__(self, array, lag, threshold, influence, scaler=MinMaxScaler, smoothing=moving_avg,
-                 smoothing_strength=1500):
+    def __init__(self, array, lag, threshold, influence):
         """
 
         :param array: prime algorithm with some data points
@@ -95,6 +94,19 @@ class RealTimePeakPredictor():
 
 
 class ScipyPeaks:
+    """
+        Possible parameters
+                {
+                "height": None,
+                "threshold": None,
+                "distance": None,
+                "prominence": [0.1],
+                "width": (1000, 5000),
+                "wlen": None,
+                "rel_height": 0.5,
+                "plateau_size": None
+            }
+    """
     def __init__(self, shift=False, scipy_params=None):
         self.peaks = None
         self.props = None
@@ -151,6 +163,11 @@ def load_experiments_data(file_regex, load_random, random_state, data_path="data
     return matches_meta
 
 
+def save_results(directory, matches_data, file_name):
+    with open(f"{directory}/{file_name}.json", "w") as out_file:
+        json.dump(matches_data, out_file)
+
+
 if __name__ == "__main__":
     parser = ArgumentParser(description="tune, run, evaluate baseline classfiers for highlight prediction on chat"
                                         "messages")
@@ -158,32 +175,41 @@ if __name__ == "__main__":
     parser.add_argument("-b", "--baseline", choices=["rtpp", "spp"], help="which baseline to run.\n\trtpp:\treal time"
                                                                           "peak predictor\n\tspp: scipy's find peaks")
     parser.add_argument("-c", "--config_file", help="path to the config file for the baseline parameter values")
+    parser.add_argument("-o", "--out_path", help="directory to store the results in")
 
     args = parser.parse_args()
 
     # load data
-    files = "nalcs*"  # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
-    matches = load_experiments_data(files, load_random=3, random_state=42)
+    files = "nalcs*g[13]"  # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
+    matches = load_experiments_data(files, load_random=2, random_state=42, data_path=args.data_path)
 
-    if args["baseline"] == "rtpp"
-        lag = 750
-        for name, m in matches.items():
-            rtpp = RealTimePeakPredictor(array=m["cd_message_density_smoothed"][:lag], lag=lag, threshold=3,
-                                         influence=0.9)
-            rtpp.fit(m["cd_message_density_smoothed"][lag:])
-            m["pred_md_spikes"] = rtpp.predict()
+    with open(args.config_file, "r") as in_file:
+        baseline_params = json.load(in_file)
 
-    if args["baseline"] == "spp":
-        peaks_params = {
-            "height": None,
-            "threshold": None,
-            "distance": None,
-            "prominence": [0.1],
-            "width": (1000, 5000),
-            "wlen": None,
-            "rel_height": 0.5,
-            "plateau_size": None
-        }
+    if args.baseline == "rtpp":
+        peaks_params = baseline_params["rtpp"]
+        param_grid = ParameterGrid(peaks_params)
+        print(f"calculating {len(param_grid)} parameter combinations")
+        for i, config in enumerate(param_grid):
+            lag = config["lag"]
+            preds_configs = dict()
+            preds_configs["config"] = config
+            print(config)
+            for name, m in matches.items():
+                rtpp = RealTimePeakPredictor(array=m["cd_message_density_smoothed"][:lag], **config)
+                rtpp.fit(m["cd_message_density_smoothed"][lag:])
+                preds_configs[name] = rtpp.predict()
+            save_results(args.out_path, preds_configs, f"rtpp_config_{i:03d}")
 
-        spp = ScipyPeaks(scipy_params=peaks_params)
-        m["pred_scipy_peaks"] = spp.predict(m["cd_message_density_smoothed"])
+    if args.baseline == "spp":
+        peaks_params = baseline_params["spp"]
+        param_grid = ParameterGrid(peaks_params)
+        print(f"calculating {len(param_grid)} parameter combinations")
+        for i, config in enumerate(param_grid):
+            preds_configs = dict()
+            preds_configs["config"] = config
+            print(config)
+            for name, m in matches.items():
+                spp = ScipyPeaks(scipy_params=config)
+                preds_configs[name] = spp.predict(m["cd_message_density_smoothed"]).tolist()
+            save_results(args.out_path, preds_configs, f"spp_config_{i:03d}")

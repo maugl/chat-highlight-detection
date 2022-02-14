@@ -389,8 +389,8 @@ if __name__ == "__main__":
     # sanity_check()
     # problem with dataset: missing highlights gold standard for nalcs_w6d3_IMT_NV_g1
 
-    file_regex = "nalcs*" # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
-    chat = load_chat("data/final_data", file_identifier=file_regex, load_random=3)
+    file_regex = "nalcs*g[13]" # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
+    chat = load_chat("data/final_data", file_identifier=file_regex)
     highlights = load_highlights("data/gt", file_identifier=file_regex) # nalcs_w1d3_TL_FLY_g2
     emotes = load_emotes("data/emotes", "*_emotes.txt")
 
