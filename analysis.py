@@ -59,9 +59,10 @@ def load_emotes(data_dir, file_identifier="*.txt"):
 def message_density(cd, window_size=100, step_size=1):
     msg_counts = np.asarray(message_counts(cd))
     msg_density = list()
+
     for i in range(0, len(cd), step_size):
-        start_ind = max(0, int(i - window_size*0.5 / 2))
-        end_ind = min(len(msg_counts), int(i + window_size*1.5 / 2))
+        start_ind = max(0, int(i - window_size / 2)) # window centered around frame
+        end_ind = min(len(msg_counts), int(i + window_size / 2)) # window centered around frame
         msg_density.append(msg_counts[start_ind:end_ind].sum())
     return np.asarray(msg_density)
 
@@ -77,6 +78,7 @@ def message_counts(cd):
 
 
 def average_message_lengths_chars(cd, interval):
+    # TODO implement with window
     if interval is None:
         interval = len(cd)
     msg_lens = message_lengths_chars(cd)
@@ -100,6 +102,7 @@ def message_lengths_chars(cd):
 
 
 def message_diversity(cd, interval):
+    # TODO implement with window
     steps = np.arange(len(cd))[::interval]
     msgs_intervals = ["\n".join(cd[steps[i-1]: steps[i]]) for i in range(len(steps))]
     msgs_tok_freqs = [token_freq(tokenize(msgs)) for msgs in msgs_intervals]
@@ -141,8 +144,8 @@ def emote_density(cd, emotes, window_size=100, step_size=1):
     emote_cnts = emote_counts(cd, emotes)
     msg_density = list()
     for i in range(0, len(cd), step_size):
-        start_ind = max(0, int(i - window_size * 0.5 / 2))
-        end_ind = min(len(emote_cnts), int(i + window_size * 1.5 / 2))
+        start_ind = max(0, int(i - window_size / 2)) # window centered around frame
+        end_ind = min(len(emote_cnts), int(i + window_size / 2)) # window centered around frame
         msg_density.append(emote_cnts[start_ind:end_ind].sum())
     return np.asarray(msg_density)
 

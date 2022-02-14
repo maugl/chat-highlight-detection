@@ -2,6 +2,7 @@ from pprint import pprint
 
 import numpy as np
 from matplotlib import pyplot as plt
+from scipy.signal import find_peaks
 from sklearn.preprocessing import MinMaxScaler
 
 from analysis import load_chat, load_highlights, remove_missing_matches, cut_same_length, message_density, \
@@ -37,8 +38,8 @@ class RealTimePeakPredictor():
         self.filteredY = np.array(self.y).tolist()
         self.avgFilter = [0] * len(self.y)
         self.stdFilter = [0] * len(self.y)
-        self.avgFilter[self.lag - 1] = np.mean(self.y[0:self.lag]).tolist()
-        self.stdFilter[self.lag - 1] = np.std(self.y[0:self.lag]).tolist()
+        self.avgFilter[self.lag - 1] = np.mean(self.y[0:self.lag])
+        self.stdFilter[self.lag - 1] = np.std(self.y[0:self.lag])
 
         self.fitted = False
 
@@ -53,15 +54,14 @@ class RealTimePeakPredictor():
             self.filteredY = np.array(self.y).tolist()
             self.avgFilter = [0] * len(self.y)
             self.stdFilter = [0] * len(self.y)
-            self.avgFilter[self.lag] = np.mean(self.y[0:self.lag]).tolist()
-            self.stdFilter[self.lag] = np.std(self.y[0:self.lag]).tolist()
+            self.avgFilter[self.lag] = np.mean(self.y[0:self.lag])
+            self.stdFilter[self.lag] = np.std(self.y[0:self.lag])
             return 0
 
         self.signals += [0]
         self.filteredY += [0]
         self.avgFilter += [0]
         self.stdFilter += [0]
-
         if abs(self.y[i] - self.avgFilter[i - 1]) > self.threshold * self.stdFilter[i - 1]:
             if self.y[i] > self.avgFilter[i - 1]:
                 self.signals[i] = 1
@@ -89,17 +89,6 @@ class RealTimePeakPredictor():
         if not self.fitted:
             return None  # or raise error
         return self.signals
-
-
-class SpikePredictorScipy:
-    def __init__(self):
-        pass
-
-    def fit(self):
-        pass
-
-    def predict(self):
-        pass
 
 
 if __name__ == "__main__":
@@ -140,13 +129,24 @@ if __name__ == "__main__":
         data_totals["video_length_secs"] += len(ch_match) / 30  # total video length in seconds (30fps)
         data_totals["highlight_count"] += hl_count
 
-    lag = 1500
+    lag = 750
     for name, m in matches_meta.items():
-        cmd_smoothed = moving_avg(MinMaxScaler().fit_transform(m["chat_message_density"].reshape(-1, 1)), N=1500)
-
-        rtpd = RealTimePeakPredictor(array=cmd_smoothed[:lag], lag=lag, threshold=3, influence=0)
+        cmd_smoothed = moving_avg(MinMaxScaler().fit_transform(m["chat_message_density"].reshape(-1, 1)), N=1500).tolist()
+        """
+        rtpd = RealTimePeakPredictor(array=cmd_smoothed[:lag], lag=lag, threshold=3, influence=0.9)
         for dat_point in cmd_smoothed[lag:]:
             rtpd.thresholding_algo(dat_point)
         m["pred_md_spikes"] = np.asarray(rtpd.signals)
+        """
+
+        scipy_peaks, peak_props = find_peaks(cmd_smoothed, height=None, threshold=None, distance=None, prominence=[0.1], width=(1000,5000), wlen=None,
+                rel_height=0.5, plateau_size=None)
+        width_inds = np.asarray([i for p, w in zip(scipy_peaks, peak_props["widths"]) for i in range(np.int(p-w/2), np.int(p+w/2))]).ravel()
+
+        print(width_inds)
+        speaks = np.zeros(len(cmd_smoothed))
+        speaks[scipy_peaks] = 1
+        speaks[width_inds] = 1
+        m["pred_scipy_peaks"] = speaks
 
     plot_matches(matches_meta)
