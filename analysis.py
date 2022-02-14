@@ -300,7 +300,6 @@ def moving_avg(mylist, N=5):
         tmp = [0 for i in range(diff)]
         tmp.extend(moving_aves)
         moving_aves = tmp
-
     return np.asarray(moving_aves)
 
 
