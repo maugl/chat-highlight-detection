@@ -117,7 +117,7 @@ class ScipyPeaks:
         self.peaks, self.props = find_peaks(x, **self.params)
         # TODO width can be made more elaborate by adding more information about the peaks to the calculation
         width_inds = np.asarray([i for p, w in zip(self.peaks, self.props["widths"]) for i in
-                                 range(np.int(p - w / 2), np.int(p + w / 2))]).ravel()
+                                 range(max(0, np.int(p - w / 2)), min(len(x), np.int(p + w / 2)))]).ravel()
         speaks = np.zeros(len(x))
         speaks[width_inds] = 1
         return speaks
