@@ -10,6 +10,7 @@ from matplotlib import pyplot as plt
 from scipy.signal import find_peaks
 from sklearn.preprocessing import MinMaxScaler
 
+import analysis
 from analysis import load_chat, load_highlights, remove_missing_matches, cut_same_length, message_density, \
     highlight_span, plot_matches, moving_avg
 
@@ -212,7 +213,7 @@ if __name__ == "__main__":
                                                                           "peak predictor\n\tspp: scipy's find peaks")
     parser.add_argument("-c", "--config_file", help="path to the config file for the baseline parameter values")
     parser.add_argument("-o", "--out_path", help="directory to store the results in")
-    parser.add_argument("-a", "--action", choices=["tr", "te", "r", "e"], help="tr: run tuning on multiple parameter"
+    parser.add_argument("-a", "--action", choices=["tr", "te", "r", "e", "test"], help="tr: run tuning on multiple parameter"
                                                                                "combinations defined in config_file\nte"
                                                                                ": evaluate all tested parameters in tr"
                                                                                "with gold data in data_path and tuning"
@@ -225,6 +226,21 @@ if __name__ == "__main__":
     parser.add_argument("-rp", "--results_path", help="Where to get tr results from.")
 
     args = parser.parse_args()
+
+    # before anything else, perform test if requested
+    if args.action == "test":
+        with open(args.config_file, "r") as in_file:
+            baseline_params = json.load(in_file)
+        peaks_params = baseline_params["spp"]
+        param_grid = ParameterGrid(peaks_params)
+        spp = ScipyPeaks(scipy_params=param_grid[0])
+
+        matches = load_experiments_data("nalcs_*", load_random=3, random_state=69, data_path=args.data_path)
+        for match, data in matches.items():
+            pred = spp.predict(data["cd_message_density_smoothed"])
+            data["pred_spp"] = pred
+
+        analysis.plot_matches(matches)
 
     # load data
     files = "nalcs*g[13]"  # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
@@ -282,3 +298,8 @@ if __name__ == "__main__":
 
         with open(f"{args.out_path}/eval_configs_{datetime.datetime.now().strftime('%Y%m%d_%H_%M_%S')}.json", "w") as out_file:
             json.dump(config_scores, out_file, indent=4)
+
+
+
+
+
