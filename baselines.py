@@ -1,6 +1,8 @@
+import glob
 import json
 from argparse import ArgumentParser
 from sklearn.model_selection import ParameterGrid
+from sklearn.metrics import precision_recall_fscore_support
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -9,6 +11,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 from analysis import load_chat, load_highlights, remove_missing_matches, cut_same_length, message_density, \
     highlight_span, plot_matches, moving_avg
+
 
 
 class RealTimePeakPredictor():
@@ -170,6 +173,29 @@ def save_results(directory, matches_data, file_name):
         json.dump(matches_data, out_file)
 
 
+def evaluate_config(config_file, match_data, output_path):
+    scores = dict()
+    with open(config_file, "r") as in_file:
+        config = json.load(in_file)
+        params = config["config"]
+        for match, prediction in config.items():
+            # TODO: change that along with the output
+            if match == "config":
+                continue
+            scores[match]["scores"] = eval_scores(prediction, match_data[match]["highlights"])
+            scores[match]["config"] = params
+    with open(f"{output_path}/", "w") as of:
+        json.dump(scores, of)
+
+def eval_scores(gold, pred):
+    p, r, f, _ = precision_recall_fscore_support(gold, pred)
+
+    return {"precision": p,
+            "recall": r,
+            "f-score": f
+            }
+
+
 if __name__ == "__main__":
     parser = ArgumentParser(description="tune, run, evaluate baseline classfiers for highlight prediction on chat"
                                         "messages")
@@ -178,6 +204,17 @@ if __name__ == "__main__":
                                                                           "peak predictor\n\tspp: scipy's find peaks")
     parser.add_argument("-c", "--config_file", help="path to the config file for the baseline parameter values")
     parser.add_argument("-o", "--out_path", help="directory to store the results in")
+    parser.add_argument("-a", "--action", choices=["tr", "te", "r", "e"], help="tr: run tuning on multiple parameter"
+                                                                               "combinations defined in config_file\nte"
+                                                                               ": evaluate all tested parameters in tr"
+                                                                               "with gold data in data_path and tuning"
+                                                                               "results in results_path. Store"
+                                                                               "evaluation results in out_path"
+                                                                               "\nr: run baseline on data in data_path"
+                                                                               "and with parameters defined in"
+                                                                               "config_file\ne: evaluate results from "
+                                                                               "running r")
+    parser.add_argument("-rp", "--results_path", help="Where to get tr results from.")
 
     args = parser.parse_args()
 
@@ -185,33 +222,42 @@ if __name__ == "__main__":
     files = "nalcs*g[13]"  # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
     matches = load_experiments_data(files, load_random=None, random_state=None, data_path=args.data_path)
 
-    with open(args.config_file, "r") as in_file:
-        baseline_params = json.load(in_file)
+    if args.action == "tr":
+        with open(args.config_file, "r") as in_file:
+            baseline_params = json.load(in_file)
 
-    if args.baseline == "rtpp":
-        peaks_params = baseline_params["rtpp"]
-        param_grid = ParameterGrid(peaks_params)
-        print(f"calculating {len(param_grid)} parameter combinations")
-        for i, config in enumerate(param_grid):
-            lag = config["lag"]
-            preds_configs = dict()
-            preds_configs["config"] = config
-            print(config)
-            for name, m in matches.items():
-                rtpp = RealTimePeakPredictor(array=m["cd_message_density_smoothed"][:lag], **config)
-                rtpp.fit(m["cd_message_density_smoothed"][lag:])
-                preds_configs[name] = rtpp.predict()
-            save_results(args.out_path, preds_configs, f"rtpp_config_{i:03d}")
+        if args.baseline == "rtpp":
+            peaks_params = baseline_params["rtpp"]
+            param_grid = ParameterGrid(peaks_params)
+            print(f"calculating {len(param_grid)} parameter combinations")
+            for i, config in enumerate(param_grid):
+                lag = config["lag"]
+                preds_configs = dict()
+                preds_configs["config"] = config
+                print(config)
+                for name, m in matches.items():
+                    rtpp = RealTimePeakPredictor(array=m["cd_message_density_smoothed"][:lag], **config)
+                    rtpp.fit(m["cd_message_density_smoothed"][lag:])
+                    preds_configs[name] = rtpp.predict()
+                save_results(args.out_path, preds_configs, f"rtpp_config_{i:03d}")
 
-    if args.baseline == "spp":
-        peaks_params = baseline_params["spp"]
-        param_grid = ParameterGrid(peaks_params)
-        print(f"calculating {len(param_grid)} parameter combinations")
-        for i, config in enumerate(param_grid):
-            preds_configs = dict()
-            preds_configs["config"] = config
-            print(config)
-            for name, m in matches.items():
-                spp = ScipyPeaks(scipy_params=config)
-                preds_configs[name] = spp.predict(m["cd_message_density_smoothed"]).tolist()
-            save_results(args.out_path, preds_configs, f"spp_config_{i:03d}")
+        if args.baseline == "spp":
+            peaks_params = baseline_params["spp"]
+            param_grid = ParameterGrid(peaks_params)
+            print(f"calculating {len(param_grid)} parameter combinations")
+            for i, config in enumerate(param_grid):
+                preds_configs = dict()
+                preds_configs["config"] = config
+                print(config)
+                for name, m in matches.items():
+                    spp = ScipyPeaks(scipy_params=config)
+                    # TODO: should be preds_configd["matches"][name]
+                    # sticking to this pattern for current testing
+                    preds_configs[name] = spp.predict(m["cd_message_density_smoothed"]).tolist()
+                save_results(args.out_path, preds_configs, f"spp_config_{i:03d}")
+
+        # evaluate multiple parameter combinations
+        if args.action == "te":
+            tuning_predictions = glob.glob(f"{args.results_path}/_config_({'[0-9]' * 14}).json")
+            for config_file in tuning_predictions:
+                evaluate_config(config_file, matches, args.out_path)
