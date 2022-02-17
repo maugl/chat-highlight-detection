@@ -13,7 +13,8 @@ from sklearn.preprocessing import MinMaxScaler
 from analysis import load_chat, load_highlights, remove_missing_matches, cut_same_length, message_density, \
     highlight_span, plot_matches, moving_avg
 
-
+import warnings
+warnings.filterwarnings('ignore')
 
 class RealTimePeakPredictor():
     """
@@ -179,13 +180,18 @@ def evaluate_config(config_file, match_data):
     with open(config_file, "r") as in_file:
         config = json.load(in_file)
         params = config["config"]
+        gold_total = list()
+        pred_total = list()
         for match, prediction in config.items():
             # TODO: change that along with the output
             if match == "config":
                 continue
             scores[match] = dict()
-            scores[match]["scores"] = eval_scores(prediction, match_data[match]["highlights"])
-    return scores, params
+            scores[match]["scores"] = eval_scores(match_data[match]["highlights"],prediction)
+            gold_total.extend(match_data[match]["highlights"])
+            pred_total.extend(prediction)
+
+    return scores, eval_scores(gold_total, pred_total), params
 
 
 def eval_scores(gold, pred):
@@ -267,9 +273,10 @@ if __name__ == "__main__":
             if baseline_name not in config_scores:
                 config_scores[baseline_name] = list()
 
-            scores, params = evaluate_config(config_file, matches)
+            scores, total_scores, params = evaluate_config(config_file, matches)
             config_scores[baseline_name].append({"params": params,
-                                                 "scores": scores
+                                                 "match_scores": scores,
+                                                 "total_scores": total_scores
                                                  })
 
         with open(f"{args.out_path}/eval_configs_{datetime.datetime.now().strftime('%Y%m%d_%H_%M_%S')}.json", "w") as out_file:
