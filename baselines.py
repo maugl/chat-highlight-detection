@@ -1,3 +1,4 @@
+import datetime
 import glob
 import json
 from argparse import ArgumentParser
@@ -173,7 +174,7 @@ def save_results(directory, matches_data, file_name):
         json.dump(matches_data, out_file)
 
 
-def evaluate_config(config_file, match_data, output_path):
+def evaluate_config(config_file, match_data):
     scores = dict()
     with open(config_file, "r") as in_file:
         config = json.load(in_file)
@@ -182,17 +183,18 @@ def evaluate_config(config_file, match_data, output_path):
             # TODO: change that along with the output
             if match == "config":
                 continue
+            scores[match] = dict()
             scores[match]["scores"] = eval_scores(prediction, match_data[match]["highlights"])
             scores[match]["config"] = params
-    with open(f"{output_path}/", "w") as of:
-        json.dump(scores, of)
+    return scores
+
 
 def eval_scores(gold, pred):
     p, r, f, _ = precision_recall_fscore_support(gold, pred)
 
-    return {"precision": p,
-            "recall": r,
-            "f-score": f
+    return {"precision": list(p),
+            "recall": list(r),
+            "f-score": list(f),
             }
 
 
@@ -256,8 +258,12 @@ if __name__ == "__main__":
                     preds_configs[name] = spp.predict(m["cd_message_density_smoothed"]).tolist()
                 save_results(args.out_path, preds_configs, f"spp_config_{i:03d}")
 
-        # evaluate multiple parameter combinations
-        if args.action == "te":
-            tuning_predictions = glob.glob(f"{args.results_path}/_config_({'[0-9]' * 14}).json")
-            for config_file in tuning_predictions:
-                evaluate_config(config_file, matches, args.out_path)
+    # evaluate multiple parameter combinations
+    if args.action == "te":
+        tuning_predictions = glob.glob(f"{args.results_path}/*_config_{'[0-9]' * 3}.json")
+        config_scores = list()
+        for config_file in tuning_predictions:
+            config_scores.append(evaluate_config(config_file, matches))
+
+        with open(f"{args.out_path}/eval_configs_{datetime.datetime.now().strftime('%Y%m%d_%H_%M_%S')}.json", "w") as out_file:
+            json.dump(config_scores, out_file)
