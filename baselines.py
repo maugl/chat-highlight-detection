@@ -265,10 +265,12 @@ if __name__ == "__main__":
         for config_file in tuning_predictions:
             baseline_name = config_file.split("_")[0]
             if baseline_name not in config_scores:
-                config_scores[baseline_name] = dict()
+                config_scores[baseline_name] = list()
 
             scores, params = evaluate_config(config_file, matches)
-            config_scores[baseline_name][params] = scores
+            config_scores[baseline_name].append({"params": params,
+                                                 "scores": scores
+                                                 })
 
         with open(f"{args.out_path}/eval_configs_{datetime.datetime.now().strftime('%Y%m%d_%H_%M_%S')}.json", "w") as out_file:
             json.dump(config_scores, out_file, indent=4)
