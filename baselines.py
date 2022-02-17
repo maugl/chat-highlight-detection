@@ -3,7 +3,7 @@ import glob
 import json
 from argparse import ArgumentParser
 from sklearn.model_selection import ParameterGrid
-from sklearn.metrics import precision_recall_fscore_support
+from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -18,7 +18,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-class RealTimePeakPredictor():
+class RealTimePeakPredictor:
     """
     theory:
     https://stackoverflow.com/a/22640362
@@ -114,7 +114,7 @@ class ScipyPeaks:
                 "plateau_size": None
             }
     """
-    def __init__(self, shift=False, scipy_params=None):
+    def __init__(self, shift=None, scipy_params=None):
         self.peaks = None
         self.props = None
         self.shift = shift # TODO implement shift for peaks
@@ -122,9 +122,21 @@ class ScipyPeaks:
 
     def predict(self, x):
         self.peaks, self.props = find_peaks(x, **self.params)
-        # TODO width can be made more elaborate by adding more information about the peaks to the calculation
+        """
         width_inds = np.asarray([i for p, w in zip(self.peaks, self.props["widths"]) for i in
                                  range(max(0, int(p - w / 2)), min(len(x), int(p + w / 2)))]).ravel()
+        """
+
+        width_inds = list()
+        for p, w in zip(self.peaks, self.props["widths"]):
+            shift_amount = 0
+            if self.shift:
+                shift_amount = int(w * self.shift)
+            hl_start = max(0, int(p - w / 2 - shift_amount))
+            hl_end = min(len(x), p - shift_amount)
+
+            width_inds.extend(list(range(hl_start, hl_end)))
+
         speaks = np.zeros(len(x))
         # check that a prediction exists
         if len(width_inds) > 0:
@@ -198,10 +210,12 @@ def evaluate_config(config_file, match_data):
 
 def eval_scores(gold, pred):
     p, r, f, _ = precision_recall_fscore_support(gold, pred)
+    acc = accuracy_score(gold, pred)
 
     return {"precision": list(p),
             "recall": list(r),
-            "f-score": list(f)
+            "f-score": list(f),
+            "accuracy": acc
             }
 
 
@@ -219,10 +233,10 @@ if __name__ == "__main__":
                                                                                "with gold data in data_path and tuning"
                                                                                "results in results_path. Store"
                                                                                "evaluation results in out_path"
-                                                                               "\nr: run baseline on data in data_path"
-                                                                               "and with parameters defined in"
+                                                                               "\nr: run baseline on test data in"
+                                                                               "data_path and with parameters defined in"
                                                                                "config_file\ne: evaluate results from "
-                                                                               "running r")
+                                                                               "running r", required=True)
     parser.add_argument("-rp", "--results_path", help="Where to get tr results from.")
 
     args = parser.parse_args()
@@ -231,20 +245,28 @@ if __name__ == "__main__":
     if args.action == "test":
         with open(args.config_file, "r") as in_file:
             baseline_params = json.load(in_file)
-        peaks_params = baseline_params["spp"]
-        param_grid = ParameterGrid(peaks_params)
-        spp = ScipyPeaks(scipy_params=param_grid[0])
+        params = baseline_params["spp"]
+        spp = ScipyPeaks(**params)
 
-        matches = load_experiments_data("nalcs_*", load_random=3, random_state=69, data_path=args.data_path)
+        matches = load_experiments_data("nalcs_*", load_random=3, random_state=None, data_path=args.data_path)
         for match, data in matches.items():
             pred = spp.predict(data["cd_message_density_smoothed"])
             data["pred_spp"] = pred
+            print(eval_scores(data["highlights"], pred))
 
         analysis.plot_matches(matches)
 
-    # load data
-    files = "nalcs*g[13]"  # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
-    matches = load_experiments_data(files, load_random=None, random_state=None, data_path=args.data_path)
+    # data loading
+
+    # load training data
+    if args.action in ["tr", "te"]:
+        # load train data
+        files = "nalcs*g[13]"  # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
+        matches = load_experiments_data(files, load_random=None, random_state=None, data_path=args.data_path)
+    if args.action in ["r", "e"]:
+        # load test data
+        files = "nalcs*g2"  # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
+        matches = load_experiments_data(files, load_random=None, random_state=None, data_path=args.data_path)
 
     if args.action == "tr":
         with open(args.config_file, "r") as in_file:
@@ -267,14 +289,22 @@ if __name__ == "__main__":
 
         if args.baseline == "spp":
             peaks_params = baseline_params["spp"]
-            param_grid = ParameterGrid(peaks_params)
+            param_grid_scipy = ParameterGrid(peaks_params["scipy_params"])
+            param_grid = list()
+            for shift in peaks_params["shift"]:
+                for scipy_params in param_grid_scipy:
+                    param_grid.append({
+                        "shift": shift,
+                        "scipy_params": scipy_params
+                    })
+
             print(f"calculating {len(param_grid)} parameter combinations")
             for i, config in enumerate(param_grid):
                 preds_configs = dict()
                 preds_configs["config"] = config
                 print(config)
                 for name, m in matches.items():
-                    spp = ScipyPeaks(scipy_params=config)
+                    spp = ScipyPeaks(**config)
                     # TODO: should be preds_configs["matches"][name]
                     # sticking to this pattern for current testing
                     preds_configs[name] = spp.predict(m["cd_message_density_smoothed"]).tolist()
@@ -300,6 +330,33 @@ if __name__ == "__main__":
             json.dump(config_scores, out_file, indent=4)
 
 
+    test_data_file_identifier = "test_data_predictions"
+    if args.action == "r":
+        # run baseline on data in data_path and with parameters defined in config_file
+        with open(args.config_file, "r") as in_file:
+            test_params = json.load(in_file)
+            config = test_params[args.baseline]
+        preds = list()
+        for name, m in matches.items():
+            spp = ScipyPeaks(scipy_params=config)
+            preds.append({
+                "match": name,
+                "pred": spp.predict(m["cd_message_density_smoothed"]).tolist()
+            })
+        save_results(f"{args.out_path}", preds, f"{args.baseline}_{test_data_file_identifier}")
 
+    if args.action == "e":
+        # e: evaluate results from running r
+        with open(f"{args.baseline}_{test_data_file_identifier}", "r") as in_file:
+            test_preds = json.load(in_file)
+            total_pred = list()
+            total_gold = list()
+            scores = list()
+            for m in test_preds:
+                name = m["name"]
+                pred = m["pred"]
+                total_pred.extend(pred)
+                total_gold.extend(matches[name]["highlights"])
+                scores.append(eval_scores(matches[name]["highlights"], pred))
 
 
