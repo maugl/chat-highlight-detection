@@ -185,8 +185,7 @@ def evaluate_config(config_file, match_data):
                 continue
             scores[match] = dict()
             scores[match]["scores"] = eval_scores(prediction, match_data[match]["highlights"])
-            scores[match]["config"] = params
-    return scores
+    return scores, params
 
 
 def eval_scores(gold, pred):
@@ -261,9 +260,15 @@ if __name__ == "__main__":
     # evaluate multiple parameter combinations
     if args.action == "te":
         tuning_predictions = glob.glob(f"{args.results_path}/*_config_{'[0-9]' * 3}.json")
-        config_scores = list()
+
+        config_scores = dict()
         for config_file in tuning_predictions:
-            config_scores.append(evaluate_config(config_file, matches))
+            baseline_name = config_file.split("_")[0]
+            if baseline_name not in config_scores:
+                config_scores[baseline_name] = dict()
+
+            scores, params = evaluate_config(config_file, matches)
+            config_scores[baseline_name][params] = scores
 
         with open(f"{args.out_path}/eval_configs_{datetime.datetime.now().strftime('%Y%m%d_%H_%M_%S')}.json", "w") as out_file:
-            json.dump(config_scores, out_file)
+            json.dump(config_scores, out_file, indent=4)
