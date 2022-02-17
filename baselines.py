@@ -16,6 +16,7 @@ from analysis import load_chat, load_highlights, remove_missing_matches, cut_sam
 import warnings
 warnings.filterwarnings('ignore')
 
+
 class RealTimePeakPredictor():
     """
     theory:
@@ -125,7 +126,7 @@ class ScipyPeaks:
                                  range(max(0, int(p - w / 2)), min(len(x), int(p + w / 2)))]).ravel()
         speaks = np.zeros(len(x))
         # check that a prediction exists
-        if len(width_inds) == len(speaks):
+        if len(width_inds) > 0:
             speaks[width_inds] = 1
         return speaks
 
@@ -187,7 +188,7 @@ def evaluate_config(config_file, match_data):
             if match == "config":
                 continue
             scores[match] = dict()
-            scores[match]["scores"] = eval_scores(match_data[match]["highlights"],prediction)
+            scores[match]["scores"] = eval_scores(match_data[match]["highlights"], prediction)
             gold_total.extend(match_data[match]["highlights"])
             pred_total.extend(prediction)
 
@@ -199,7 +200,7 @@ def eval_scores(gold, pred):
 
     return {"precision": list(p),
             "recall": list(r),
-            "f-score": list(f),
+            "f-score": list(f)
             }
 
 
@@ -258,7 +259,7 @@ if __name__ == "__main__":
                 print(config)
                 for name, m in matches.items():
                     spp = ScipyPeaks(scipy_params=config)
-                    # TODO: should be preds_configd["matches"][name]
+                    # TODO: should be preds_configs["matches"][name]
                     # sticking to this pattern for current testing
                     preds_configs[name] = spp.predict(m["cd_message_density_smoothed"]).tolist()
                 save_results(args.out_path, preds_configs, f"spp_config_{i:03d}")
@@ -266,7 +267,7 @@ if __name__ == "__main__":
     # evaluate multiple parameter combinations
     if args.action == "te":
         tuning_predictions = glob.glob(f"{args.results_path}/*_config_{'[0-9]' * 3}.json")
-
+        print(tuning_predictions)
         config_scores = dict()
         for config_file in tuning_predictions:
             baseline_name = config_file.split("/")[-1].split("_")[0]
