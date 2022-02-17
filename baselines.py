@@ -263,7 +263,7 @@ if __name__ == "__main__":
 
         config_scores = dict()
         for config_file in tuning_predictions:
-            baseline_name = config_file.split("_")[0]
+            baseline_name = config_file.split("/")[-1].split("_")[0]
             if baseline_name not in config_scores:
                 config_scores[baseline_name] = list()
 
