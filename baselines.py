@@ -100,7 +100,7 @@ class RealTimePeakPredictor:
     def predict(self):
         if not self.fitted:
             return None  # or raise error
-        return self.signals
+        return [abs(d) for d in self.signals]
 
 
 class ScipyPeaks:
@@ -254,23 +254,30 @@ if __name__ == "__main__":
         with open(args.config_file, "r") as in_file:
             baseline_params = json.load(in_file)
             params = baseline_params[args.baseline]
+            matches = load_experiments_data("nalcs_*", load_random=3, random_state=None, data_path=args.data_path)
         if args.baseline == "spp":
             spp = ScipyPeaks(**params)
-
-            matches = load_experiments_data("nalcs_*", load_random=3, random_state=None, data_path=args.data_path)
             for match, data in matches.items():
                 pred = spp.predict(data["cd_message_density_smoothed"])
                 data["pred_spp"] = pred
                 print(eval_scores(data["highlights"], pred))
 
-            analysis.plot_matches(matches)
-
         if args.baseline == "rtpp":
+            lag = params["lag"]
             scale = params["scale"]
             del params["scale"]
-            rtpp = RealTimePeakPredictor(**params)
+            for name, data in matches.items():
+                msg_density_scaled = data["cd_message_density_smoothed"][::scale]
+                data["chat_message_density"] = data["chat_message_density"][::scale]
+                rtpp = RealTimePeakPredictor(array=msg_density_scaled[:lag], **params)
+                rtpp.fit(msg_density_scaled[lag:])
+                pred = [abs(d) for d in rtpp.predict()]
+                data["pred_rtpp"] = pred
+                # scale down gold data as well, maybe losing some highlights?
+                data["highlights"] = data["highlights"][::scale]
+                print(eval_scores(data["highlights"], pred))
 
-
+        analysis.plot_matches(matches)
 
     # data loading
 
