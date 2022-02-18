@@ -88,8 +88,9 @@ class RealTimePeakPredictor:
         return self.signals[i]
 
     def fit(self, x):
-        if x is np.ndarray:
+        if type(x) is np.ndarray:
             x = x.tolist()
+
         for data_point in x:
             self.thresholding_algo(data_point)
         self.fitted = True
@@ -275,15 +276,19 @@ if __name__ == "__main__":
         if args.baseline == "rtpp":
             peaks_params = baseline_params["rtpp"]
             param_grid = ParameterGrid(peaks_params)
+            print(args.baseline)
             print(f"calculating {len(param_grid)} parameter combinations")
             for i, config in enumerate(param_grid):
                 lag = config["lag"]
                 preds_configs = dict()
                 preds_configs["config"] = config
-                print(config)
+                print(f"{i:03d}", config)
+                scale = config["scale"]
+                del config["scale"]
                 for name, m in matches.items():
-                    rtpp = RealTimePeakPredictor(array=m["cd_message_density_smoothed"][:lag], **config)
-                    rtpp.fit(m["cd_message_density_smoothed"][lag:])
+                    msg_density_scaled = m["cd_message_density_smoothed"][::scale]
+                    rtpp = RealTimePeakPredictor(array=msg_density_scaled[:lag], **config)
+                    rtpp.fit(msg_density_scaled[lag:])
                     preds_configs[name] = rtpp.predict()
                 save_results(args.out_path, preds_configs, f"rtpp_config_{i:03d}")
 
