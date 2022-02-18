@@ -197,13 +197,18 @@ def evaluate_config(config_file, match_data):
         params = config["config"]
         gold_total = list()
         pred_total = list()
+
         for match, prediction in config.items():
             # TODO: change that along with the output
             if match == "config":
                 continue
+            if "scale" in params:
+                gold_data = match_data[match]["highlights"][::params["scale"]]
+            else:
+                gold_data = match_data[match]["highlights"]
             scores[match] = dict()
-            scores[match]["scores"] = eval_scores(match_data[match]["highlights"], prediction)
-            gold_total.extend(match_data[match]["highlights"])
+            scores[match]["scores"] = eval_scores(gold_data, prediction)
+            gold_total.extend(gold_data)
             pred_total.extend(prediction)
 
     return scores, eval_scores(gold_total, pred_total), params
@@ -246,16 +251,24 @@ if __name__ == "__main__":
     if args.action == "test":
         with open(args.config_file, "r") as in_file:
             baseline_params = json.load(in_file)
-        params = baseline_params["spp"]
-        spp = ScipyPeaks(**params)
+            params = baseline_params[args.baseline]
+        if args.baseline == "spp":
+            spp = ScipyPeaks(**params)
 
-        matches = load_experiments_data("nalcs_*", load_random=3, random_state=None, data_path=args.data_path)
-        for match, data in matches.items():
-            pred = spp.predict(data["cd_message_density_smoothed"])
-            data["pred_spp"] = pred
-            print(eval_scores(data["highlights"], pred))
+            matches = load_experiments_data("nalcs_*", load_random=3, random_state=None, data_path=args.data_path)
+            for match, data in matches.items():
+                pred = spp.predict(data["cd_message_density_smoothed"])
+                data["pred_spp"] = pred
+                print(eval_scores(data["highlights"], pred))
 
-        analysis.plot_matches(matches)
+            analysis.plot_matches(matches)
+
+        if args.baseline == "rtpp":
+            scale = params["scale"]
+            del params["scale"]
+            rtpp = RealTimePeakPredictor(**params)
+
+
 
     # data loading
 
