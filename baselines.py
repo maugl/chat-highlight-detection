@@ -2,6 +2,8 @@ import datetime
 import glob
 import json
 from argparse import ArgumentParser
+from copy import copy
+
 from sklearn.model_selection import ParameterGrid
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
@@ -294,7 +296,7 @@ if __name__ == "__main__":
             for i, config in enumerate(param_grid):
                 lag = config["lag"]
                 preds_configs = dict()
-                preds_configs["config"] = config
+                preds_configs["config"] = copy(config)
                 print(f"{i:03d}", config)
                 scale = config["scale"]
                 del config["scale"]
