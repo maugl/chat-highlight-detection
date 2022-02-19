@@ -117,10 +117,11 @@ class ScipyPeaks:
                 "plateau_size": None
             }
     """
-    def __init__(self, shift=None, scipy_params=None):
+    def __init__(self, shift=None, width_scale=0.5, scipy_params=None):
         self.peaks = None
         self.props = None
-        self.shift = shift # TODO implement shift for peaks
+        self.shift = shift
+        self.width_scale = width_scale
         self.params = scipy_params
 
     def predict(self, x):
@@ -135,10 +136,10 @@ class ScipyPeaks:
             shift_amount = 0
             if self.shift:
                 shift_amount = int(w * self.shift)
-            hl_start = max(0, int(p - w / 2 - shift_amount))
-            hl_end = min(len(x), p - shift_amount)
+            hl_start = max(0, int(p - w/2 * self.width_scale - shift_amount)) # should be changed to + shift amount for more intuitive values
+            hl_end = min(len(x), p + w/2 * self.width_scale - shift_amount)
 
-            width_inds.extend(list(range(hl_start, hl_end)))
+            width_inds.extend(list(range(int(hl_start), int(hl_end))))
 
         speaks = np.zeros(len(x))
         # check that a prediction exists
@@ -254,7 +255,7 @@ if __name__ == "__main__":
         with open(args.config_file, "r") as in_file:
             baseline_params = json.load(in_file)
             params = baseline_params[args.baseline]
-            matches = load_experiments_data("nalcs_*", load_random=3, random_state=None, data_path=args.data_path)
+            matches = load_experiments_data("nalcs_*", load_random=3, random_state=42, data_path=args.data_path)
         if args.baseline == "spp":
             spp = ScipyPeaks(**params)
             for match, data in matches.items():
@@ -268,7 +269,8 @@ if __name__ == "__main__":
             del params["scale"]
             for name, data in matches.items():
                 msg_density_scaled = data["cd_message_density_smoothed"][::scale]
-                data["chat_message_density"] = data["chat_message_density"][::scale]
+                data["pred_chat_message_density"] = data["cd_message_density_smoothed"][::scale]
+                del data["chat_message_density"]
                 rtpp = RealTimePeakPredictor(array=msg_density_scaled[:lag], **params)
                 rtpp.fit(msg_density_scaled[lag:])
                 pred = [abs(d) for d in rtpp.predict()]

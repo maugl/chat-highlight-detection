@@ -346,6 +346,7 @@ def plot_matches(matches):
         for k2 in matches[k1].keys():
             if k2.startswith("chat"):
                 dat = matches[k1][k2]
+                # flip moving average and MinMaxScaler
                 ax.plot(np.arange(len(dat)), moving_avg(MinMaxScaler().fit_transform(dat.reshape(-1, 1)), N=1500), linewidth=.5, label=k2)
                 # ax.plot(np.arange(len(dat)), MinMaxScaler().fit_transform(dat.reshape(-1, 1)), linewidth=.5, label=f"{k2} no smoothing")
             if k2 == "highlights" or k2.startswith("pred"):
