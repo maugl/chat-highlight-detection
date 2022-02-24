@@ -1,3 +1,5 @@
+import json
+
 import tcd
 import subprocess
 import glob
@@ -21,8 +23,11 @@ def lol_twitch_channels_from_liquipedia_scraper():
                 first_stream = streams_table.cssselect("tr:nth-child(2) > td:nth-child(2) > a")
                 if first_stream:
                     stream_links = stream_links.union({first_stream[0].get("href")})
-            if len(stream_links)%10 == 0:
+            if len(stream_links)%5 == 0:
                 print(stream_links)
+
+    with open("../data/stream_links.json", "w") as out_file:
+        json.dump(list(stream_links), out_file)
 
 
 def existing_videos(output_dir):
