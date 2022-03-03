@@ -1,26 +1,20 @@
 import json
 
-from credentials import client_id, client_secret
+from credentials import client_id
 import requests
+
+from twitch_authentication import authenticate
 
 
 def global_emotes():
-    headers={"Authorization": f"Bearer {authenticate()}",
+    bearer_token, _ = authenticate()
+    headers = {"Authorization": f"Bearer {bearer_token}",
              "Client-ID": client_id
              }
     resp = requests.get('https://api.twitch.tv/helix/chat/emotes/global', headers=headers)
 
     with open("data/emotes/twitch_emotes.json", "w") as out_file:
         json.dump(resp.json(), out_file)
-
-
-def authenticate():
-    resp = requests.post(f"https://id.twitch.tv/oauth2/token?client_id={client_id}&client_secret={client_secret}&grant_type=client_credentials")
-    print(resp.json())
-    # print(resp.json()["access_token"])
-    # resp_val = requests.get("https://id.twitch.tv/oauth2/validate", headers={'Authorization': resp.json()["access_token"]})
-    # print(resp_val.json())
-    return resp.json()["access_token"]
 
 
 def list_emotes():
