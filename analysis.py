@@ -11,6 +11,7 @@ from collections import Counter
 from scipy.stats import entropy
 from sklearn.preprocessing import MinMaxScaler
 import random
+import math
 """FILE LOADING"""
 
 
@@ -406,6 +407,8 @@ if __name__ == "__main__":
         "video_length_secs": 0,  # total length of all videos combined
         "highlight_count": 0,  # number of total highlights
         "highlight_length_secs": 0,  # total length of all highlights combined
+        "highlight_min_len_frames": math.inf,  # minimum highlight length in frames
+        "highlight_max_len_frames": 0,  # maximum highlight length in frames
 
         "chat_message_count": 0, # number of total chat messages in dataset
         "chat_message_count_avg_video": 0, # avg number of chat messages per video
@@ -456,6 +459,8 @@ if __name__ == "__main__":
         data_totals["video_length_secs"] += len(ch_match) / 30  # total video length in seconds (30fps)
         data_totals["highlight_count"] += hl_count
         data_totals["highlight_length_secs"] += sum(hl_lens) / 30  # total highlight length in seconds (30fps)
+        data_totals["highlight_min_len_frames"] = min(data_totals["highlight_min_len_frames"], min(hl_lens) if hl_lens else math.inf)
+        data_totals["highlight_max_len_frames"] = max(data_totals["highlight_max_len_frames"], max(hl_lens) if hl_lens else 0)
 
         data_totals["chat_message_count"] += sum(message_counts(ch_match))
         data_totals["chat_message_count_hl"] += len(cd_messages_highlights)
@@ -467,7 +472,7 @@ if __name__ == "__main__":
     data_totals["highlight_length_proportion"] = data_totals["highlight_length_secs"] / data_totals["video_length_secs"]
     data_totals["highlight_message_count_proportion"] = data_totals["chat_message_count_hl"] / data_totals["chat_message_count"]
 
-    plot_matches(matches_meta)
+    #plot_matches(matches_meta)
     pprint(data_totals)
 
     """
@@ -484,14 +489,14 @@ if __name__ == "__main__":
     plt.show()
     """
 
-    """
+
     for k1 in matches_meta.keys():
         for k2 in matches_meta[k1].keys():
             if type(matches_meta[k1][k2]) == np.ndarray:
                 matches_meta[k1][k2] = matches_meta[k1][k2].tolist()
-    with open("data/analysis/someMatches.json", "w") as out_file:
-        json.dump(matches_meta, out_file)
-    """
+    with open("data/analysis/MatchesMeta_train.json", "w") as out_file:
+        json.dump(matches_meta, out_file, indent=4)
+
 
 
     """

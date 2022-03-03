@@ -26,7 +26,7 @@ def lol_twitch_channels_from_liquipedia_scraper():
             if len(stream_links)%5 == 0:
                 print(stream_links)
 
-    with open("../data/stream_links.json", "w") as out_file:
+    with open("data/stream_links.json", "w") as out_file:
         json.dump(list(stream_links), out_file)
 
 
@@ -52,6 +52,8 @@ def download_video_chat(video_id=None, output_dir="~/Downloads"):
     return True
 
 
+
 if __name__ == "__main__":
     # print(multi_download_video_chat(["1304598130", "1303600567"], output_dir="data/videos_chat"))
-    lol_twitch_channels_from_liquipedia_scraper()
+    # lol_twitch_channels_from_liquipedia_scraper()
+

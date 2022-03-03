@@ -218,7 +218,7 @@ def evaluate_config(config_file, match_data):
 
 
 def eval_scores(gold, pred):
-    p, r, f, _ = precision_recall_fscore_support(gold, pred)
+    p, r, f, _ = precision_recall_fscore_support(gold, pred, average="binary")
     acc = accuracy_score(gold, pred)
 
     return {"precision": list(p),
