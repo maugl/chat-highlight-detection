@@ -11,6 +11,8 @@ import requests
 from credentials import client_id
 from twitch_authentication import authenticate
 
+from argparse import ArgumentParser
+
 
 def lol_twitch_channels_from_liquipedia_scraper():
     # Liquipedia S-Tier / A-Tier
@@ -157,22 +159,50 @@ def download_video_chat(video_id=None, output_dir="data/videos_chat"):
     return True
 
 
-
 if __name__ == "__main__":
+    parser = ArgumentParser(description="Discover all VODs of a given Twitch channel and"
+                                        "download the chat of those videos")
+    parser.add_argument("action", choices=["vids", "chat"],help="which action to perform:\n"
+                                                                "vids: fetch video info for channel names\n"
+                                                                "chat: download chat for fetched videos")
+    parser.add_argument("output", help="path where to save the downloaded data")
+    parser.add_argument("-c", "--channels", nargs="+", help="")
+    parser.add_argument("-v", "--videos", nargs="+", help="Twitch video IDs to download. Only applicable if action is"
+                                                          "'vids'")
+    parser.add_argument("-i", "--input", help="Directory with json file(s) containing Twitch video data to "
+                                                        "download. Only applicable if action is 'chat'")
+    args = parser.parse_args()
     # print(multi_download_video_chat(["1304598130", "1303600567"], output_dir="data/videos_chat"))
     # lol_twitch_channels_from_liquipedia_scraper()
-    ch_names = ["lolpacific", "riotgames", "lck", "eumasters", "esl_lol", "riotlan", "garenaesports", "lec", "lpl"]
-    ch_infos = list()
-    for ch_name in ch_names:
-        channel_info = get_channel_info_from_channel_name(ch_name)
-        ch_infos.append(channel_info)
-        ch_id = channel_info["id"]
-        vids = get_vids_for_channel(ch_id, language="en")
+    # ch_names = ["lolpacific", "riotgames", "lck", "eumasters", "esl_lol", "riotlan", "garenaesports", "lec", "lpl"]
 
-        print(f"found {len(vids)} videos for channel '{ch_name}'")
+    if args.action == "vids":
+        ch_names = args.channels
+        ch_infos = list()
+        for ch_name in ch_names:
+            channel_info = get_channel_info_from_channel_name(ch_name)
+            ch_infos.append(channel_info)
+            ch_id = channel_info["id"]
+            vids = get_vids_for_channel(ch_id, language="en")
 
-        with open(f"data/video_info/{ch_name}_vids.json", "w") as out_vids_file:
-            json.dump(vids, out_vids_file)
-    with open(f"data/video_info/channels.json", "w") as out_ch_file:
-        json.dump(ch_infos, out_ch_file)
+            print(f"found {len(vids)} videos for channel '{ch_name}'")
+
+            with open(f"data/video_info/{ch_name}_vids.json", "w") as out_vids_file:
+                json.dump(vids, out_vids_file)
+        with open(f"data/video_info/channels.json", "w") as out_ch_file:
+            json.dump(ch_infos, out_ch_file)
+    if args.action == "chat":
+        if args.videos:
+            multi_download_video_chat(args.videos, args.output)
+        if args.path:
+            channel_vids_paths = glob.glob(f"{args.input}/*.json")
+
+            for cvp in channel_vids_paths:
+                with open(cvp, "r") as in_vids_file:
+                    vids = [v["id"] for v in json.load(in_vids_file)]
+                    multi_download_video_chat(vids, args.output)
+
+
+
+
 
