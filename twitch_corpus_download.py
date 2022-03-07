@@ -1,5 +1,6 @@
 import json
 import math
+import os
 
 import subprocess
 import glob
@@ -144,6 +145,9 @@ def multi_download_video_chat(video_ids, output_dir="data/videos_chat"):
         ret_vals.append(download_video_chat(vid, output_dir))
         if ret_vals[-1]:
             existing_vids.append(vid)
+        if len(ret_vals) % 50 == 0:
+            print(f"{datetime.now().strftime('%Y/%m/%d_%H:%M:%S')}: downloaded {len(existing_vids)} successfully out of "
+                  f"{len(ret_vals)} attempted.")
     return ret_vals
 
 
@@ -194,13 +198,20 @@ if __name__ == "__main__":
     if args.action == "chat":
         if args.videos:
             multi_download_video_chat(args.videos, args.output)
-        if args.path:
-            channel_vids_paths = glob.glob(f"{args.input}/*.json")
+        if args.input:
+            channel_vids_paths = glob.glob(f"{args.input}/*_vids.json")
 
             for cvp in channel_vids_paths:
                 with open(cvp, "r") as in_vids_file:
                     vids = [v["id"] for v in json.load(in_vids_file)]
-                    multi_download_video_chat(vids, args.output)
+                    out_path = args.output + "/" + cvp.split("/")[-1].split("_")[0]
+
+                    if not os.path.exists(out_path):
+                        os.makedirs(f"{out_path}/")
+
+                    downloaded = multi_download_video_chat(vids, out_path)
+                    print(f"{datetime.now().strftime('%Y%m%d_%H_%M_%S')}: finished download for {cvp} - {sum(downloaded)} successful,"
+                          f"{len(downloaded) - sum(downloaded)} unsuccessful.")
 
 
 
