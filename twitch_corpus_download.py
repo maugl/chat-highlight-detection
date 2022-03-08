@@ -191,9 +191,9 @@ if __name__ == "__main__":
 
             print(f"found {len(vids)} videos for channel '{ch_name}'")
 
-            with open(f"data/video_info/{ch_name}_vids.json", "w") as out_vids_file:
+            with open(f"{args.output}/{ch_name}_vids.json", "w") as out_vids_file:
                 json.dump(vids, out_vids_file)
-        with open(f"data/video_info/channels.json", "w") as out_ch_file:
+        with open(f"{args.output}/channels.json", "w") as out_ch_file:
             json.dump(ch_infos, out_ch_file)
     if args.action == "chat":
         if args.videos:
