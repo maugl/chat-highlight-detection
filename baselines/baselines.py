@@ -13,8 +13,9 @@ from scipy.signal import find_peaks
 from sklearn.preprocessing import MinMaxScaler
 
 import analysis
-from analysis import load_chat, load_highlights, remove_missing_matches, cut_same_length, message_density, \
+from analysis import remove_missing_matches, cut_same_length, message_density, \
     highlight_span, plot_matches, moving_avg
+from data_loading import load_chat, load_highlights
 
 import warnings
 warnings.filterwarnings('ignore')

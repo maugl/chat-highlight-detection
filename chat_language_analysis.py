@@ -11,6 +11,8 @@ import analysis
 from collections import Counter
 import pandas as pd
 
+import data_loading
+
 
 def tokenize_chat(messages):
     """
@@ -62,9 +64,9 @@ def decay(x, strength):
 
 if __name__ == "__main__":
     file_regex = "nalcs_w1d3_TL_FLY_g1"  # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
-    chat = analysis.load_chat("data/final_data", file_identifier=file_regex)
-    highlights = analysis.load_highlights("data/gt", file_identifier=file_regex)  # nalcs_w1d3_TL_FLY_g2
-    emotes = {em.lower() for em in analysis.load_emotes("data/emotes", "*_emotes.txt")}
+    chat = data_loading.load_chat("data/final_data", file_identifier=file_regex)
+    highlights = data_loading.load_highlights("data/gt", file_identifier=file_regex)  # nalcs_w1d3_TL_FLY_g2
+    emotes = {em.lower() for em in data_loading.load_emotes("data/emotes", "*_emotes.txt")}
 
     analysis.remove_missing_matches(chat, highlights)
 

@@ -7,6 +7,8 @@ from scipy.interpolate import krogh_interpolate
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 
+import data_loading
+
 
 def interpolate(series, window_size=100):
     # assuming 1D series
@@ -25,8 +27,8 @@ def interpolate(series, window_size=100):
 
 if __name__ == "__main__":
     file_regex = "nalcs*"  # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
-    chat = analysis.load_chat("data/final_data", file_identifier=file_regex, load_random=1, random_state=42)
-    highlights = analysis.load_highlights("data/gt", file_identifier=file_regex)  # nalcs_w1d3_TL_FLY_g2
+    chat = data_loading.load_chat("../data/final_data", file_identifier=file_regex, load_random=1, random_state=42)
+    highlights = data_loading.load_highlights("../data/gt", file_identifier=file_regex)  # nalcs_w1d3_TL_FLY_g2
     analysis.remove_missing_matches(chat, highlights)
 
     cut = 30 * 10  # 5, 10 sec intervals in 30 fps video, why? just because!

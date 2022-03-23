@@ -34,7 +34,7 @@ def compile_emote_list(path="data/emotes/FFZ/library"):
             emotes = json.load(in_file)
             all_emotes.extend(emotes["emoticons"])
 
-    with open("data/emotes/FFZ/ffz_emotes_20220201.json", "w") as out_file:
+    with open("../data/emotes/FFZ/ffz_emotes_20220201.json", "w") as out_file:
         json.dump(all_emotes, out_file)
 
     emote_names = set()

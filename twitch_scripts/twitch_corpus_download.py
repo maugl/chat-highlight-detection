@@ -35,7 +35,7 @@ def lol_twitch_channels_from_liquipedia_scraper():
             if len(stream_links)%5 == 0:
                 print(stream_links)
 
-    with open("data/stream_links.json", "w") as out_file:
+    with open("../data/stream_links.json", "w") as out_file:
         json.dump(list(stream_links), out_file)
 
 

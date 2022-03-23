@@ -13,13 +13,13 @@ def global_emotes():
              }
     resp = requests.get('https://api.twitch.tv/helix/chat/emotes/global', headers=headers)
 
-    with open("data/emotes/twitch_emotes.json", "w") as out_file:
+    with open("../data/emotes/twitch_emotes.json", "w") as out_file:
         json.dump(resp.json(), out_file)
 
 
 def list_emotes():
     emote_data = None
-    with open("data/emotes/twitch_emotes.json", "r") as in_file:
+    with open("../data/emotes/twitch_emotes.json", "r") as in_file:
         emote_data = json.load(in_file)
 
     emote_names = set()
@@ -27,7 +27,7 @@ def list_emotes():
         emote_names.add(em["name"])
         print(em["name"])
 
-    with open("data/emotes/twitch_emotes.txt", "w") as out_file:
+    with open("../data/emotes/twitch_emotes.txt", "w") as out_file:
         out_file.write("\n".join(list(sorted(emote_names))))
 
     print(len(emote_data["data"]))
