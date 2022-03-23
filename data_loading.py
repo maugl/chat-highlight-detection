@@ -16,25 +16,26 @@ class ChatHighlightData:
                  chat_dir="data/final_data",
                  highlight_dir="data/gt",
                  emote_dir="data/emotes",
-                 scale=1,
-                 frame_rate=30):
+                 frame_rate=30,
+                 window=1,
+                 step=1):
         # file directories
         self.chat_dir = chat_dir
         self.highlight_dir = highlight_dir
         self.emote_dir = emote_dir
 
         # parameters for computation of measures
-        self.scale = scale
+        self.window = window
+        self.step = step
         self._frame_rate = frame_rate
 
         # data structures
         self.highlights = dict()
         self.chat = dict()
-        self.matches_meta = dict()
+        self.matches_meta = None
         self.data_totals = None
         self.chat_measures = dict()
         self.emotes = None
-
 
     CHAT_MEASURES = {
         "message_density": message_density,
@@ -63,11 +64,58 @@ class ChatHighlightData:
             self.emote_dir = emote_dir
         self.emotes = load_emotes(self.emote_dir, file_identifier)
 
-    def compute_chat_measure(self, measure_name, window, step):
-        pass
+    def get_highlight_data(self, unscaled=False):
+        if unscaled:
+            return self.highlights
+        else:
+            return {match: v[::self.step] for match, v in self.highlights.items()}
 
-    def compute_match_meta_data(self):
-        pass
+    def set_window_step(self, window, step):
+        if self.window != window or self.step != step:
+            self.window = window
+            self.step = step
+            for measure in self.chat_measures:
+                self._compute_chat_measure(measure)
+
+    def _compute_chat_measure(self, measure_name):
+        measure = self.CHAT_MEASURES[measure_name]
+        self.chat_measures[measure_name] = dict()
+        for match, chat in self.chat.items():
+            if measure_name == "emote_density":
+                if self.emotes is not None:
+                    self.chat_measures[measure_name][match] = measure(chat, self.emotes, self.window, self.step)
+                else:
+                    raise Exception("No emotes loaded")
+            else:
+                self.chat_measures[measure_name][match] = measure(chat, self.window, self.step)
+
+    def get_chat_measure(self, measure_name):
+        if measure_name not in self.chat_measures:
+            self._compute_chat_measure(measure_name)
+
+        return self.chat_measures[measure_name]
+
+    def _compute_match_meta_data(self):
+        self.matches_meta = dict()
+        for match, hl in self.highlights.items():
+            hl_spans = highlight_span(hl)
+            hl_lens = [e - s + 1 for s, e in hl_spans]
+
+            self.matches_meta[match] = {
+                "highlight_spans": hl_spans,
+                "highlight_lengths": hl_lens,
+                "highlight_count": len(hl_lens),
+                "highlight_avg_len": sum(hl_lens) / len(hl_lens) if 0 < len(hl_lens) else 0,
+            }
+
+    def get_match_meta_data(self, match=None):
+        if self.matches_meta is None:
+            self._compute_match_meta_data()
+
+        if match is not None:
+            return self.matches_meta[match]
+        else:
+            return self.matches_meta
 
     def _compute_data_totals(self):
         self.data_totals = {
@@ -89,8 +137,8 @@ class ChatHighlightData:
             ch_match = self.chat[match]
             hl_match = self.highlights[match]
 
-            hl_spans = highlight_span(hl_match)
-            hl_lens = [e - s + 1 for s, e in hl_spans]
+            match_meta = self.get_match_meta_data(match)
+            hl_lens = match_meta["highlight_lengths"]
             hl_count = len(hl_lens)
 
             # total numbers over all matches
@@ -113,7 +161,6 @@ class ChatHighlightData:
         self.data_totals["chat_message_count_avg_hl"] = self.data_totals["chat_message_count_hl"] / self.data_totals["highlight_count"]
         self.data_totals["highlight_length_proportion"] = self.data_totals["highlight_length_secs"] / self.data_totals["video_length_secs"]
         self.data_totals["highlight_message_count_proportion"] = self.data_totals["chat_message_count_hl"] / self.data_totals["chat_message_count"]
-
 
     def get_data_totals(self):
         if self.data_totals is None:
@@ -205,4 +252,19 @@ if __name__ == "__main__":
     chd = ChatHighlightData()
     file_regex = "nalcs_w1d3_TL_FLY_g*" # "nalcs*g[13]" "nalcs_w1d3_TL_FLY_g*" "nalcs_w*d3_*g1"
     chd.load_data(file_identifier=file_regex)
-    pprint(chd.get_data_totals())
+    chd.load_emotes()
+    # pprint(chd.get_data_totals())
+    # pprint(chd.get_match_meta_data())
+
+    for m in chd.CHAT_MEASURES:
+        pprint(chd.get_chat_measure(m))
+        print([len(v) for v in chd.get_chat_measure(m).values()])
+
+    pprint(chd.get_highlight_data())
+    print([len(v) for v in chd.get_highlight_data().values()])
+
+    chd.set_window_step(window=1500, step=50)
+    pprint(chd.get_chat_measure("message_density"))
+    print([len(v) for v in chd.get_chat_measure("message_density").values()])
+    pprint(chd.get_highlight_data())
+    print([len(v) for v in chd.get_highlight_data().values()])
