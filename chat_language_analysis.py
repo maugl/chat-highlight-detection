@@ -68,7 +68,7 @@ if __name__ == "__main__":
     highlights = data_loading.load_highlights("data/gt", file_identifier=file_regex)  # nalcs_w1d3_TL_FLY_g2
     emotes = {em.lower() for em in data_loading.load_emotes("data/emotes", "*_emotes.txt")}
 
-    analysis.remove_missing_matches(chat, highlights)
+    data_loading.remove_missing_matches(chat, highlights)
 
     tokens = list()
     matches = list()
@@ -82,7 +82,7 @@ if __name__ == "__main__":
     copy_pasta_inds = dict()
 
     for match in chat.keys():
-        ch_match, hl_match = analysis.cut_same_length(chat[match], highlights[match])
+        ch_match, hl_match = data_loading.cut_same_length(chat[match], highlights[match])
         chat[match] = ch_match
         highlights[match] = hl_match
 

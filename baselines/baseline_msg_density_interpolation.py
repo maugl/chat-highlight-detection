@@ -7,6 +7,7 @@ from scipy.interpolate import krogh_interpolate
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 
+import chat_measures
 import data_loading
 
 
@@ -29,7 +30,7 @@ if __name__ == "__main__":
     file_regex = "nalcs*"  # "nalcs_w1d3_TL_FLY_g*" # "nalcs_w*d3_*g1"
     chat = data_loading.load_chat("../data/final_data", file_identifier=file_regex, load_random=1, random_state=42)
     highlights = data_loading.load_highlights("../data/gt", file_identifier=file_regex)  # nalcs_w1d3_TL_FLY_g2
-    analysis.remove_missing_matches(chat, highlights)
+    data_loading.remove_missing_matches(chat, highlights)
 
     cut = 30 * 10  # 5, 10 sec intervals in 30 fps video, why? just because!
 
@@ -39,7 +40,7 @@ if __name__ == "__main__":
     hl_spans = list()
 
     for match in chat.keys():
-        ch_match, hl_match = analysis.cut_same_length(chat[match], highlights[match])
+        ch_match, hl_match = data_loading.cut_same_length(chat[match], highlights[match])
         chat[match] = ch_match
         highlights[match] = hl_match
         matches.append(match)
@@ -52,7 +53,8 @@ if __name__ == "__main__":
         # print(highlight_spans_p20)
         hl_spans.append(highlight_spans)
 
-        cd_message_density_smooth = analysis.moving_avg(analysis.message_density(ch_match, window_size=300, step_size=300), N=1500)
+        cd_message_density_smooth = analysis.moving_avg(
+            chat_measures.message_density(ch_match, window_size=300, step_size=300), N=1500)
         density_data.append(cd_message_density_smooth)
         interpolations.append(interpolate(cd_message_density_smooth, window_size=100))
     # flatten

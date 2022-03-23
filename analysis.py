@@ -3,194 +3,12 @@ from pprint import pprint
 import numpy as np
 import json
 # from moviepy.editor import VideoFileClip
-import re
 import matplotlib.pyplot as plt
-from collections import Counter
-from scipy.stats import entropy
 from sklearn.preprocessing import MinMaxScaler
 import math
 
-from data_loading import load_chat, load_highlights, load_emotes
-
-"""FILE LOADING"""
-
-"""CHAT MEASURES"""
-def message_density(cd, window_size=100, step_size=1):
-    msg_counts = np.asarray(message_counts(cd))
-    msg_density = list()
-
-    for i in range(0, len(cd), step_size):
-        start_ind = max(0, int(i - window_size / 2)) # window centered around frame
-        end_ind = min(len(msg_counts), int(i + window_size / 2)) # window centered around frame
-        msg_density.append(msg_counts[start_ind:end_ind].sum())
-    return np.asarray(msg_density)
-
-
-def message_counts(cd):
-    msg_cnts = list()
-    for frame in cd:
-        if frame == "":
-            msg_cnts.append(0)
-        else:
-            msg_cnts.append(len(unpack_messages([frame])))
-    return msg_cnts
-
-
-def average_message_lengths_chars(cd, interval):
-    # TODO implement with window
-    if interval is None:
-        interval = len(cd)
-    msg_lens = message_lengths_chars(cd)
-    steps = np.arange(len(cd))[::interval]
-    # average by interval window
-    avg_msg_lens = np.add.reduceat(msg_lens, steps) / np.add.reduceat(message_counts(cd), steps)
-    return avg_msg_lens
-
-
-def message_lengths_chars(cd):
-    # multiple messages per frame => calculate average
-    split_re = re.compile("\n")
-    msg_lengths = list()
-    for frame in cd:
-        if frame == "":
-            msg_lengths.append(0)
-        else:
-            frame_msgs = [len(m) for m in split_re.split(frame)[:-1]] # remove new line message divider and split messages
-            msg_lengths.append(sum(frame_msgs))
-    return msg_lengths
-
-
-def message_diversity(cd, interval):
-    # TODO implement with window
-    steps = np.arange(len(cd))[::interval]
-    msgs_intervals = ["\n".join(cd[steps[i-1]: steps[i]]) for i in range(len(steps))]
-    msgs_tok_freqs = [token_freq(tokenize(msgs)) for msgs in msgs_intervals]
-    return [normalized_entropy(token_prob(freqs)) for _, freqs in msgs_tok_freqs]
-
-
-def tokenize(text):
-    text = re.sub("\n+", " ", text)
-    return [t for t in re.split("\\s+", text) if t != ""]
-
-
-def token_freq(tokens):
-    freqs = Counter(tokens)
-    return list(freqs.keys()), list(freqs.values())
-
-
-def token_prob(freqs):
-    num_tokens = len(freqs)
-    return [f/num_tokens for f in freqs]
-
-
-def normalized_entropy(probs):
-    if len(probs) > 1:
-        log_len_probs = np.log2(len(probs))
-        return entropy(probs)/log_len_probs
-    else:
-        return 0
-
-
-def emote_density(cd, emotes, window_size=100, step_size=1):
-    """
-
-    :param cd: chat data, list of frame-wise concatenated chats
-    :param emotes: set of emotes to compare against
-    :param window_size:
-    :param step_size:
-    :return:
-    """
-    emote_cnts = emote_counts(cd, emotes)
-    msg_density = list()
-    for i in range(0, len(cd), step_size):
-        start_ind = max(0, int(i - window_size / 2)) # window centered around frame
-        end_ind = min(len(emote_cnts), int(i + window_size / 2)) # window centered around frame
-        msg_density.append(emote_cnts[start_ind:end_ind].sum())
-    return np.asarray(msg_density)
-
-
-def emote_counts(cd, emotes):
-    """
-    Count emotes per frame
-    :param cd: chat data, list of frame-wise concatenated chats
-    :param emotes: set of emotes to compare against
-    :return:
-    """
-    emote_cnts = list()
-    for frame in cd:
-        if frame == "":
-            emote_cnts.append(0)
-        else:
-            emote_cnts.append(sum([tok in emotes for tok in tokenize("\n".join(unpack_messages([frame])))]))
-    return np.asarray(emote_cnts)
-
-
-def msgs_hl_non_hl(cd, hl):
-    cd = np.asarray(cd)
-
-    msgs_hl = cd[np.where(hl == 1)]
-    msgs_non_hl = cd[np.where(hl == 0)]
-
-    return unpack_messages(msgs_hl), unpack_messages(msgs_non_hl)
-
-
-def unpack_messages(cd):
-    """
-    :param cd: iterable of strings with chat messages, individual messages separated by '\n'
-    :return: unpacked messages in iterable, one string per message, no empty strings returned
-    """
-    unpacked = []
-    for m in cd:
-        ms = m.split("\n")
-        unpacked.extend([m1 for m1 in ms if len(m1) > 0])
-    return unpacked
-
-
-def copypasta_density(cd, window_size=100, step_size=1, n_gram_length=3, threshold=30):
-    """
-    finds copypasta in twitch chat messages
-    :param threshold: threshold for how many occurences of one ngram is considered to be copypasta
-    :param cd: tokenized chat messages
-    :param window_size:
-    :param step_size:
-    :param n_gram_length: number of n_grams to be checked
-    :return: index of copy pasta messages
-    """
-    ngl = n_gram_length
-
-    n_gram_counts = Counter()
-    ct_ngrams = list()
-    # first pass: count n_grams_total
-    for frame in cd:
-        if frame == "":
-            ct_ngrams.append("")
-            pass
-        else:
-            tks = tokenize("\n".join(unpack_messages([frame])))
-            # n-gram generation
-            ngrams = list(zip(*[([""] * ngl + tks + [""] * ngl)[i:-ngl + i] for i in range(ngl)]))
-            ct_ngrams.append(ngrams)
-            ngc = Counter(ngrams)
-            n_gram_counts.update(ngc)
-
-    # second pass count copy pasta n_grams per frame
-    # maybe remove that if we can keep a reference to the Counter value determined above
-    n_gram_indices = list()
-    for frame in ct_ngrams:
-        if frame == "":
-            n_gram_indices.append(0)
-        else:
-            n_gram_indices.append(sum([n_gram_counts[n_gram] if n_gram_counts[n_gram] >= threshold else 0 for n_gram in frame]))
-
-    n_gram_indices = np.asarray(n_gram_indices)
-    cp_density = list()
-    for i in range(0, len(cd), step_size):
-        start_ind = max(0, int(i - window_size * 0.5 / 2))
-        end_ind = min(len(n_gram_indices), int(i + window_size * 1.5 / 2))
-        cp_density.append(n_gram_indices[start_ind:end_ind].sum())
-    # possibly add decay if copy pasting was done further away (in terms of number of messages in between)
-    return np.asarray(cp_density)
-
+from chat_measures import message_density, message_counts, emote_density, copypasta_density
+from data_loading import load_chat, load_highlights, load_emotes, remove_missing_matches, cut_same_length
 
 """HIGHLIGHT STATISTICS"""
 def highlight_count(hl):
@@ -239,6 +57,15 @@ def highlight_span(hl):
     return hls
 
 
+def msgs_hl_non_hl(cd, hl):
+    cd = np.asarray(cd)
+
+    msgs_hl = cd[np.where(hl == 1)]
+    msgs_non_hl = cd[np.where(hl == 0)]
+
+    return unpack_messages(msgs_hl), unpack_messages(msgs_non_hl)
+
+
 """UTILS"""
 
 
@@ -262,41 +89,18 @@ def moving_avg(mylist, N=5):
     return np.asarray(moving_aves)
 
 
-def remove_missing_matches(cd, hd):
-    missing_in_hl = set(cd.keys()) - set(hd.keys())
-    missing_in_ch = set(hd.keys()) - set(cd.keys())
-
-    print("missing in highlights:\t", missing_in_hl)
-    print("missing in chat:\t", missing_in_ch)
-
-    for m in missing_in_hl:
-        cd.pop(m)
-    for m in missing_in_ch:
-        hd.pop(m)
-    assert len(set(cd.keys()) - set(hd.keys())) == 0 # double check
-
-
-def cut_same_length(cd, hd, cut_where="end"):
+def unpack_messages(cd):
     """
-    Cut gold standard and chat data to same lengths. In the dataset the data has differing lengths.
-    :param cd: chat data
-    :param hd: highlight (gold standard) data
-    :param cut_where: 'end': cut off the end of the shorter data, 'start': cut off beginning of shorter data
-    :return: cut chat data, cut highlight data, both to same lengths
+    :param cd: iterable of strings with chat messages, individual messages separated by '\n'
+    :return: unpacked messages in iterable, one string per message, no empty strings returned
     """
+    unpacked = []
+    for m in cd:
+        ms = m.split("\n")
+        unpacked.extend([m1 for m1 in ms if len(m1) > 0])
+    return unpacked
 
-    min_len = min(len(cd), len(hd))
-
-    if cut_where == "end":
-        cd_cut = cd[:min_len]
-        hd_cut = hd[:min_len]
-    elif cut_where == "start":
-        cd_cut = cd[len(cd) - min_len:]
-        hd_cut = hd[len(hd) - min_len:]
-
-    return cd_cut, hd_cut
-
-
+# TODO rewrite to be more general for allowing to plot any chat related variables without processing
 def plot_matches(matches):
     fig, axs = plt.subplots(len(matches.keys()), sharex="all")
     for i, k1 in enumerate(matches.keys()): # fails if only one match is selected
@@ -315,31 +119,6 @@ def plot_matches(matches):
     handles, labels = axs[0].get_legend_handles_labels()
     fig.legend(handles, labels, loc='upper left')
     plt.show()
-
-
-def sanity_check():
-    chat = load_chat("data/final_data", file_identifier="nalcs_w1d3_TL_FLY_g2")
-    highlights = load_highlights("data/gt", file_identifier="nalcs_w1d3_TL_FLY_g2")
-    # sanity check assumption: data contains info for each video frame
-    # check that video has same number of frames as chat and highlights
-    print("items in chat:", len(chat[list(chat.keys())[0]]))
-    print("items in highlights: ", highlights[list(highlights.keys())[0]].shape[0])
-    # clip = VideoFileClip("data/videos/nalcs_w1d3_TL_FLY_g2.mp4")
-    print("frames in video: ", clip.reader.nframes)
-    print("framerate: ", clip.fps)
-    # inspect some data
-    print(chat[list(chat.keys())[0]][:100])
-    print(highlights[list(highlights.keys())[0]][:100])
-    # inspect data where there is a highlight
-    highlight_ind = np.where(highlights[list(highlights.keys())[0]] == 1)[0]
-    print(chat[list(chat.keys())[0]][highlight_ind[0]: highlight_ind[100]])
-    print(highlights[list(highlights.keys())[0]][highlight_ind[0]: highlight_ind[100]])
-
-    cut = 30 * 5  # 5 sec intervals in 30 fps video, why? just because!
-    cd_message_counts = message_counts(ch_match)
-
-    multichats = np.where(np.asarray(cd_message_counts) > 1)
-    print("some frames with mutiple chat messages:", np.asarray(ch_match)[multichats][:10])
 
 
 if __name__ == "__main__":

@@ -7,148 +7,20 @@ from copy import copy
 from sklearn.model_selection import ParameterGrid
 from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
-import numpy as np
-from matplotlib import pyplot as plt
-from scipy.signal import find_peaks
 from sklearn.preprocessing import MinMaxScaler
 
 import analysis
-from analysis import remove_missing_matches, cut_same_length, message_density, \
-    highlight_span, plot_matches, moving_avg
-from data_loading import load_chat, load_highlights
+from analysis import highlight_span, moving_avg
+from baselines.RealTimePeakPredictor import RealTimePeakPredictor
+from baselines.ScipyPeaks import ScipyPeaks
+from chat_measures import message_density
+from data_loading import load_chat, load_highlights, remove_missing_matches, cut_same_length
 
 import warnings
 warnings.filterwarnings('ignore')
 
 
-class RealTimePeakPredictor:
-    """
-    theory:
-    https://stackoverflow.com/a/22640362
-
-    implementation
-    https://stackoverflow.com/a/56451135
-    Spike detection algorithm
-    """
-    def __init__(self, array, lag, threshold, influence):
-        """
-
-        :param array: prime algorithm with some data points
-        :param lag: minimum number of datapoints with which to prime alorithm, determines how much your data will be
-        smoothed and how adaptive the algorithm is to changes in the long-term average of the data
-        :param threshold: number of standard deviations from the moving mean above which the algorithm will classify a
-        new datapoint as being a signal
-        :param influence: determines the influence of signals on the algorithm's detection threshold
-        """
-        self.y = list(array)
-        self.length = len(self.y)
-        self.lag = lag
-        self.threshold = threshold
-        self.influence = influence
-        self.signals = [0] * len(self.y)
-        self.filteredY = np.array(self.y).tolist()
-        self.avgFilter = [0] * len(self.y)
-        self.stdFilter = [0] * len(self.y)
-        self.avgFilter[self.lag - 1] = np.mean(self.y[0:self.lag])
-        self.stdFilter[self.lag - 1] = np.std(self.y[0:self.lag])
-
-        self.fitted = False
-
-    def thresholding_algo(self, new_value):
-        self.y.append(new_value)
-        i = len(self.y) - 1
-        self.length = len(self.y)
-        if i < self.lag:
-            return 0
-        elif i == self.lag:
-            self.signals = [0] * len(self.y)
-            self.filteredY = np.array(self.y).tolist()
-            self.avgFilter = [0] * len(self.y)
-            self.stdFilter = [0] * len(self.y)
-            self.avgFilter[self.lag] = np.mean(self.y[0:self.lag])
-            self.stdFilter[self.lag] = np.std(self.y[0:self.lag])
-            return 0
-
-        self.signals += [0]
-        self.filteredY += [0]
-        self.avgFilter += [0]
-        self.stdFilter += [0]
-        if abs(self.y[i] - self.avgFilter[i - 1]) > self.threshold * self.stdFilter[i - 1]:
-            if self.y[i] > self.avgFilter[i - 1]:
-                self.signals[i] = 1
-            else:
-                self.signals[i] = -1
-
-            self.filteredY[i] = self.influence * self.y[i] + (1 - self.influence) * self.filteredY[i - 1]
-            self.avgFilter[i] = np.mean(self.filteredY[(i - self.lag):i])
-            self.stdFilter[i] = np.std(self.filteredY[(i - self.lag):i])
-        else:
-            self.signals[i] = 0
-            self.filteredY[i] = self.y[i]
-            self.avgFilter[i] = np.mean(self.filteredY[(i - self.lag):i])
-            self.stdFilter[i] = np.std(self.filteredY[(i - self.lag):i])
-
-        return self.signals[i]
-
-    def fit(self, x):
-        if type(x) is np.ndarray:
-            x = x.tolist()
-
-        for data_point in x:
-            self.thresholding_algo(data_point)
-        self.fitted = True
-
-    def predict(self):
-        if not self.fitted:
-            return None  # or raise error
-        return [abs(d) for d in self.signals]
-
-
-class ScipyPeaks:
-    """
-        Possible parameters
-                {
-                "height": None,
-                "threshold": None,
-                "distance": None,
-                "prominence": [0.1],
-                "width": (1000, 5000),
-                "wlen": None,
-                "rel_height": 0.5,
-                "plateau_size": None
-            }
-    """
-    def __init__(self, shift=None, width_scale=0.5, scipy_params=None):
-        self.peaks = None
-        self.props = None
-        self.shift = shift
-        self.width_scale = width_scale
-        self.params = scipy_params
-
-    def predict(self, x):
-        self.peaks, self.props = find_peaks(x, **self.params)
-        """
-        width_inds = np.asarray([i for p, w in zip(self.peaks, self.props["widths"]) for i in
-                                 range(max(0, int(p - w / 2)), min(len(x), int(p + w / 2)))]).ravel()
-        """
-
-        width_inds = list()
-        for p, w in zip(self.peaks, self.props["widths"]):
-            shift_amount = 0
-            if self.shift:
-                shift_amount = int(w * self.shift)
-            hl_start = max(0, int(p - w/2 * self.width_scale - shift_amount)) # should be changed to + shift amount for more intuitive values
-            hl_end = min(len(x), p + w/2 * self.width_scale - shift_amount)
-
-            width_inds.extend(list(range(int(hl_start), int(hl_end))))
-
-        speaks = np.zeros(len(x))
-        # check that a prediction exists
-        if len(width_inds) > 0:
-            speaks[width_inds] = 1
-        return speaks
-
-
+#TODO replace with parameterized method from data_loading
 def load_experiments_data(file_regex, load_random, random_state, data_path="data"):
     chat = load_chat(f"{data_path}/final_data", file_identifier=file_regex, load_random=load_random, random_state=random_state)
     highlights = load_highlights(f"{data_path}/gt", file_identifier=file_regex)  # nalcs_w1d3_TL_FLY_g2
@@ -194,6 +66,7 @@ def save_results(directory, matches_data, file_name):
         json.dump(matches_data, out_file)
 
 
+# TODO delete and replace with sklearn pipeline
 def evaluate_config(config_file, match_data):
     scores = dict()
     with open(config_file, "r") as in_file:
@@ -218,6 +91,7 @@ def evaluate_config(config_file, match_data):
     return scores, eval_scores(gold_total, pred_total), params
 
 
+# TODO replace with sklearn pipeline
 def eval_scores(gold, pred):
     p, r, f, _ = precision_recall_fscore_support(gold, pred, average="binary")
     acc = accuracy_score(gold, pred)
