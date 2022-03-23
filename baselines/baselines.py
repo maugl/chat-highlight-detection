@@ -10,7 +10,9 @@ from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 from sklearn.preprocessing import MinMaxScaler
 
 import analysis
-from analysis import highlight_span, moving_avg
+import utils
+from analysis import highlight_span
+from utils import moving_avg
 from baselines.RealTimePeakPredictor import RealTimePeakPredictor
 from baselines.ScipyPeaks import ScipyPeaks
 from chat_measures import message_density
@@ -154,7 +156,7 @@ if __name__ == "__main__":
                 data["highlights"] = data["highlights"][::scale]
                 print(eval_scores(data["highlights"], pred))
 
-        analysis.plot_matches(matches)
+        utils.plot_matches(matches)
 
     # data loading
 

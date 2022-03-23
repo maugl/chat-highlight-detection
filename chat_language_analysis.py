@@ -12,6 +12,7 @@ from collections import Counter
 import pandas as pd
 
 import data_loading
+import utils
 
 
 def tokenize_chat(messages):
@@ -89,7 +90,7 @@ if __name__ == "__main__":
         matches.append(match)
 
         # copy pasta
-        ch_match_tokenized = remove_stopwords(tokenize_chat(analysis.unpack_messages(ch_match)))
+        ch_match_tokenized = remove_stopwords(tokenize_chat(utils.unpack_messages(ch_match)))
         tokens.append(ch_match_tokenized)
         copy_pasta_inds[match] = detect_copypasta(ch_match_tokenized)
 

@@ -9,6 +9,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 import chat_measures
 import data_loading
+import utils
 
 
 def interpolate(series, window_size=100):
@@ -53,7 +54,7 @@ if __name__ == "__main__":
         # print(highlight_spans_p20)
         hl_spans.append(highlight_spans)
 
-        cd_message_density_smooth = analysis.moving_avg(
+        cd_message_density_smooth = utils.moving_avg(
             chat_measures.message_density(ch_match, window_size=300, step_size=300), N=1500)
         density_data.append(cd_message_density_smooth)
         interpolations.append(interpolate(cd_message_density_smooth, window_size=100))
