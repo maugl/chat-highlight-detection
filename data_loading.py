@@ -93,7 +93,7 @@ class ChatHighlightData:
                     else:
                         raise Exception("No emotes loaded")
                 if measure_name == "copypasta_density":
-                    vals[measure_name] = measure(chat, self.window, self.step) / precomputed_message_density[match]
+                    vals[match] = measure(chat, self.window, self.step) / precomputed_message_density[match]
             else:
                 vals[match] = measure(chat, self.window, self.step)
 

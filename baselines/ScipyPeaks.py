@@ -69,7 +69,6 @@ class ScipyPeaks:
         if len(width_inds) > 0:
             speaks[width_inds] = 1
 
-        print(speaks.shape, shape)
         if shape == speaks.shape:
             return speaks
         else:
