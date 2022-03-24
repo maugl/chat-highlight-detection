@@ -1,3 +1,6 @@
+import sys
+sys.path.insert(0, "/..")
+
 from argparse import ArgumentParser
 
 from data_loading import ChatHighlightData
