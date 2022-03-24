@@ -34,7 +34,7 @@ class ChatHighlightData:
         self.chat = dict()
         self.matches_meta = None
         self.data_totals = None
-        self.chat_measures = dict()
+        # self.chat_measures = dict()
         self.emotes = None
 
     CHAT_MEASURES = {
@@ -74,26 +74,33 @@ class ChatHighlightData:
         if self.window != window or self.step != step:
             self.window = window
             self.step = step
+            """
             for measure in self.chat_measures:
                 self._compute_chat_measure(measure)
+            """
 
     def _compute_chat_measure(self, measure_name):
         measure = self.CHAT_MEASURES[measure_name]
-        self.chat_measures[measure_name] = dict()
+        vals = dict()
+        precomputed_message_density = None
         for match, chat in self.chat.items():
-            if measure_name == "emote_density":
-                if self.emotes is not None:
-                    self.chat_measures[measure_name][match] = measure(chat, self.emotes, self.window, self.step)
-                else:
-                    raise Exception("No emotes loaded")
+            if measure_name == "emote_density" or measure_name == "copypasta_density":
+                if precomputed_message_density is None:
+                    precomputed_message_density = self.get_chat_measure("message_density")
+                if measure_name == "emote_density":
+                    if self.emotes is not None:
+                        vals[match] = measure(chat, self.emotes, self.window, self.step) / precomputed_message_density[match]
+                    else:
+                        raise Exception("No emotes loaded")
+                if measure_name == "copypasta_density":
+                    vals[measure_name] = measure(chat, self.window, self.step) / precomputed_message_density[match]
             else:
-                self.chat_measures[measure_name][match] = measure(chat, self.window, self.step)
+                vals[match] = measure(chat, self.window, self.step)
+
+        return vals
 
     def get_chat_measure(self, measure_name):
-        if measure_name not in self.chat_measures:
-            self._compute_chat_measure(measure_name)
-
-        return self.chat_measures[measure_name]
+        return self._compute_chat_measure(measure_name)
 
     def _compute_match_meta_data(self):
         self.matches_meta = dict()
@@ -168,9 +175,8 @@ class ChatHighlightData:
         return self.data_totals
 
     def set_frame_rate(self, frame_rate=30):
-        # TODO recompute all measures and
+        # TODO recompute all measures
         pass
-
 
 def load_chat(chat_dir, file_identifier="*", load_random=None, random_state=None):
     chat_files = glob.glob("{}//{}.json".format(chat_dir, file_identifier))
@@ -217,14 +223,13 @@ def remove_missing_matches(cd, hd):
     missing_in_hl = set(cd.keys()) - set(hd.keys())
     missing_in_ch = set(hd.keys()) - set(cd.keys())
 
-    print("missing in highlights:\t", missing_in_hl)
-    print("missing in chat:\t", missing_in_ch)
-
     for m in missing_in_hl:
         cd.pop(m)
     for m in missing_in_ch:
         hd.pop(m)
     assert len(set(cd.keys()) - set(hd.keys())) == 0 # double check
+
+    return "missing in highlights:\t", missing_in_hl, "missing in chat:\t", missing_in_ch
 
 
 def cut_same_length(cd, hd, cut_where="end"):
@@ -246,6 +251,7 @@ def cut_same_length(cd, hd, cut_where="end"):
         hd_cut = hd[len(hd) - min_len:]
 
     return cd_cut, hd_cut
+
 
 
 if __name__ == "__main__":

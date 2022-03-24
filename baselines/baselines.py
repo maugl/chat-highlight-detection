@@ -9,12 +9,10 @@ from sklearn.metrics import precision_recall_fscore_support, accuracy_score
 
 from sklearn.preprocessing import MinMaxScaler
 
-import analysis
-import utils
-from analysis import highlight_span
+from utils import highlight_span
 from utils import moving_avg
-from baselines.RealTimePeakPredictor import RealTimePeakPredictor
-from baselines.ScipyPeaks import ScipyPeaks
+import RealTimePeakPredictor
+import ScipyPeaks
 from chat_measures import message_density
 from data_loading import load_chat, load_highlights, remove_missing_matches, cut_same_length
 
@@ -98,9 +96,9 @@ def eval_scores(gold, pred):
     p, r, f, _ = precision_recall_fscore_support(gold, pred, average="binary")
     acc = accuracy_score(gold, pred)
 
-    return {"precision": list(p),
-            "recall": list(r),
-            "f-score": list(f),
+    return {"precision": p,
+            "recall": r,
+            "f-score": f,
             "accuracy": acc
             }
 

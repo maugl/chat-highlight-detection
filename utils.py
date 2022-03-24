@@ -60,6 +60,12 @@ def msgs_hl_non_hl(cd, hl):
 
 
 def moving_avg(mylist, N=5):
+    try:
+        shape = mylist.shape
+        mylist = np.ravel(mylist)
+    except AttributeError:
+        shape = (1, -1)
+
     cumsum, moving_aves = [0], []
 
     for i, x in enumerate(mylist, 1):
@@ -73,7 +79,8 @@ def moving_avg(mylist, N=5):
         tmp = [0 for i in range(diff)]
         tmp.extend(moving_aves)
         moving_aves = tmp
-    return np.asarray(moving_aves)
+
+    return np.asarray(moving_aves).reshape(shape)
 
 
 def unpack_messages(cd):
