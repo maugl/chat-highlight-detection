@@ -63,4 +63,4 @@ if __name__ == "__main__":
 
     v_inf, v2i = load_vid_info(args.info_files_path)
     v_inf = load_vids_chat(args.chat_files_path, v_inf, v2i)
-    save_vid_info(v_inf, output)
+    save_vid_info(v_inf, args.output)
