@@ -48,13 +48,13 @@ def load_data(mode, ch_dir, hl_dir, em_dir, param_grid):
         yield i, x, y, params
 
 
-def param_search(eval_params, model, data_loader):
+def param_search(eval_params, model, data_loader, out_path):
     best_scores_params = list()
 
     print(f"{datetime.now().strftime('%Y%m%d_%H_%M_%S')}")
 
     for i, x, y, p in data_loader:
-        pl = Pipeline([("avg", FunctionTransformer(moving_avg)),
+        pl = Pipeline([("avg", FunctionTransformer(moving_avg, validate=False)),
                        ("scaler", MinMaxScaler()),
                        ("clf", model())
                        ])
@@ -70,18 +70,18 @@ def param_search(eval_params, model, data_loader):
         if i % 30 == 0:
             print(f"{datetime.now().strftime('%Y%m%d_%H_%M_%S')}: evaluated {i} configurations")
             with open(
-                    f"../data/analysis/baselines/grid_search/GridSearchCV_{type(model()).__name__}_{datetime.now().strftime('%Y%m%d_%H_%M_%S')}_PART_{i}.json",
+                    f"{out_path}/GridSearchCV_{type(model()).__name__}_{datetime.now().strftime('%Y%m%d_%H_%M_%S')}_PART_{i}.json",
                     "w") as out_file:
                 json.dump(best_scores_params, out_file)
 
     print(f"{datetime.now().strftime('%Y%m%d_%H_%M_%S')}")
     with open(
-            f"../data/analysis/baselines/grid_search/GridSearchCV_{type(model()).__name__}_{datetime.now().strftime('%Y%m%d_%H_%M_%S')}.json",
+            f"{out_path}/GridSearchCV_{type(model()).__name__}_{datetime.now().strftime('%Y%m%d_%H_%M_%S')}.json",
             "w") as out_file:
         json.dump(best_scores_params, out_file)
 
 # example run
-# python3 baselines_pipelines.py -m train -b spp -p "/home/mgut1/data" -o
+# python3 baselines_pipelines.py -m train -b spp -p "/home/mgut1/data" -o "/home/mgut/data/baselines/grid_search"
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="tune, run, evaluate baseline classfiers for highlight prediction on chat"
@@ -130,4 +130,4 @@ if __name__ == "__main__":
 
     dat = iter(load_data(mode=args.mode, ch_dir=f"{args.data_path}/final_data/", hl_dir=f"{args.data_path}/gt/",
                          em_dir=f"{args.data_path}/emotes/", param_grid=prep_param_grid))
-    param_search(eval_params=eval_params, model=model, data_loader=dat)
+    param_search(eval_params=eval_params, model=model, data_loader=dat, out_path=out_path)
