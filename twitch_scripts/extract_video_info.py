@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 from zipfile import ZipFile
 import pandas as pd
 import glob
-import datetime.datetime
+from datetime import datetime
 
 
 def load_vid_info(info_files_path):
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     # example run (chat messages):
     # python3 extract_video_info -i "/home/mgut1/data/video_info/*_vids.json" -c "/home/mgut1/data/videos_chat/*_vids_chat.zip" -o /home/mgut1/data/videos_chat/corpus -m chat_messages
     # test run (chat messages):
-    # python3 extract_video_info -i "/home/mgut1/data/video_info/*_vids.json" -c "/home/mgut1/data/videos_chat/*_vids_chat.zip" -o /home/mgut1/data/videos_chat/corpus -m chat_messages
+    # python3 extract_video_info -i "/home/mgut1/data/video_info/lolpacific_vids.json" -c "/home/mgut1/data/videos_chat/*_vids_chat.zip" -o /home/mgut1/data/videos_chat/corpus -m chat_messages
 
     args = parser.parse_args()
     
