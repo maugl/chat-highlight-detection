@@ -130,4 +130,4 @@ if __name__ == "__main__":
 
     dat = iter(load_data(mode=args.mode, ch_dir=f"{args.data_path}/final_data/", hl_dir=f"{args.data_path}/gt/",
                          em_dir=f"{args.data_path}/emotes/", param_grid=prep_param_grid))
-    param_search(eval_params=eval_params, model=model, data_loader=dat, out_path=out_path)
+    param_search(eval_params=eval_params, model=model, data_loader=dat, out_path=args.out_path)
