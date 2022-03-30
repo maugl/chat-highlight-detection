@@ -75,10 +75,10 @@ def save_vid_info(vid_info, vid_info_out):
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="load information from downloaded video chat  zip files")
-    parser.add_argument("-i", "info_files_path", help="path where to load the info about the videos from")
-    parser.add_argument("-c", "chat_files_path", help="path where to load chat data from")
-    parser.add_argument("-o", "output", help="path where to save the extracted data")
-    parser.add_argument("-m", "mode", choices=["vid_info", "chat_messages"], help="Whch action to perform, if 'vid_info', a csv file with message counts and video information is created. If 'chat_messages', all the messages are extracted into text files, one message per line, one file per video and written.")
+    parser.add_argument("-i", "--info_files_path", help="path where to load the info about the videos from")
+    parser.add_argument("-c", "--chat_files_path", help="path where to load chat data from")
+    parser.add_argument("-o", "--output", help="path where to save the extracted data")
+    parser.add_argument("-m", "--mode", choices=["vid_info", "chat_messages"], help="Whch action to perform, if 'vid_info', a csv file with message counts and video information is created. If 'chat_messages', all the messages are extracted into text files, one message per line, one file per video and written.")
 
     # example run (chat messages):
     # python3 extract_video_info -i "/home/mgut1/data/video_info/*_vids.json" -c "/home/mgut1/data/videos_chat/*_vids_chat.zip" -o /home/mgut1/data/videos_chat/corpus -m chat_messages
