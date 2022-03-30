@@ -10,7 +10,7 @@ class RealTimePeakPredictor:
     https://stackoverflow.com/a/56451135
     Spike detection algorithm
     """
-    def __init__(self, array, lag, threshold, influence):
+    def __init__(self, array=None, lag=0, threshold=1, influence=0):
         """
 
         :param array: prime algorithm with some data points
@@ -20,11 +20,26 @@ class RealTimePeakPredictor:
         new datapoint as being a signal
         :param influence: determines the influence of signals on the algorithm's detection threshold
         """
+
+        self.stdFilter = None
+        self.avgFilter = None
+        self.filteredY = None
+        self.signals = None
+        self.length = None
+        self.y = None
+
+        self.lag = None
+        self.threshold = None
+        self.influence = None
+
+        self.set_params(lag, threshold, influence)
+
+        if array:
+            self.prime_algorithm(array)
+
+    def prime_algorithm(self, array):
         self.y = list(array)
         self.length = len(self.y)
-        self.lag = lag
-        self.threshold = threshold
-        self.influence = influence
         self.signals = [0] * len(self.y)
         self.filteredY = np.array(self.y).tolist()
         self.avgFilter = [0] * len(self.y)
@@ -32,7 +47,6 @@ class RealTimePeakPredictor:
         self.avgFilter[self.lag - 1] = np.mean(self.y[0:self.lag])
         self.stdFilter[self.lag - 1] = np.std(self.y[0:self.lag])
 
-        self.fitted = False
 
     def thresholding_algo(self, new_value):
         self.y.append(new_value)
@@ -70,15 +84,28 @@ class RealTimePeakPredictor:
 
         return self.signals[i]
 
-    def fit(self, x):
+    def fit(self, x, y, **kwargs):
+        return self
+
+    def predict(self, x):
+        shape = None
         if type(x) is np.ndarray:
-            x = x.tolist()
+            shape = x.shape
+            x = x.ravel().tolist()
+
+        primer = x[:self.lag]
+        x = x[self.lag:]
+        self.prime_algorithm(primer)
 
         for data_point in x:
             self.thresholding_algo(data_point)
-        self.fitted = True
 
-    def predict(self):
-        if not self.fitted:
-            return None  # or raise error
-        return [abs(d) for d in self.signals]
+        ret = [abs(d) for d in self.signals]
+        if shape:
+            ret = np.asarray(ret).reshape(shape)
+        return ret
+
+    def set_params(self, lag, threshold, influence):
+        self.lag = lag
+        self.threshold = threshold
+        self.influence = influence
