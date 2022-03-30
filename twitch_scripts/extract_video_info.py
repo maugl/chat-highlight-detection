@@ -43,7 +43,7 @@ def load_vids_chat(chat_files_path, vid_info, vid2ind):
     return vid_info
 
 
-def extract_messages(chat_files_path, out_dir, vid_info, vid2ind):
+def extract_messages(chat_files_path, out_dir):
     chat_files = glob.glob(chat_files_path)
     num_files_extracted = 0
     for chat_file_name in chat_files:
@@ -56,7 +56,7 @@ def extract_messages(chat_files_path, out_dir, vid_info, vid2ind):
                     with open(f"{out_dir}/{video_id}.txt", "w") as out_file:
                         out_file.write("\n".join([msg["message"]["body"] for msg in vid_chat["comments"]]))
                     num_files_extracted += 1
-            if i%25 == 0:
+            if num_files_extracted%25 == 0:
                 print(f"{datetime.now().strftime('%Y/%m/%d_%H:%M:%S')}: extracted {num_files_extracted} chat files.")
                         
 
@@ -82,19 +82,18 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--mode", choices=["vid_info", "chat_messages"], help="Whch action to perform, if 'vid_info', a csv file with message counts and video information is created. If 'chat_messages', all the messages are extracted into text files, one message per line, one file per video and written.")
 
     # example run (chat messages):
-    # python3 extract_video_info -i "/home/mgut1/data/video_info/*_vids.json" -c "/home/mgut1/data/videos_chat/*_vids_chat.zip" -o /home/mgut1/data/videos_chat/corpus -m chat_messages
+    # python3 extract_video_info -c "/home/mgut1/data/videos_chat/*_vids_chat.zip" -o /home/mgut1/data/videos_chat/corpus -m chat_messages
     # test run (chat messages):
-    # python3 extract_video_info -i "/home/mgut1/data/video_info/lolpacific_vids.json" -c "/home/mgut1/data/videos_chat/*_vids_chat.zip" -o /home/mgut1/data/videos_chat/corpus -m chat_messages
+    # python3 extract_video_info -c "/home/mgut1/data/videos_chat/lolpacific_vids_chat.zip" -o /home/mgut1/data/videos_chat/corpus -m chat_messages
 
     args = parser.parse_args()
-    
-    # prepare general video information
-    v_inf, v2i = load_vid_info(args.info_files_path)
-    
+
     if args.mode == "vid_info":
+        # prepare general video information
+        v_inf, v2i = load_vid_info(args.info_files_path)
         v_inf = load_vids_chat(args.chat_files_path, v_inf, v2i)
         save_vid_info(v_inf, args.output)
     if args.mode == "chat_messages":
         print(f"{datetime.now().strftime('%Y/%m/%d_%H:%M:%S')}: extracting chat messages...")
         make_corpus_dir(args.output)
-        extract_messages("../data/videos_chat/*_vids_chat.zip", args.output, v_inf, v2i)
+        extract_messages(args.chat_files_path, args.output)
