@@ -4,6 +4,7 @@ from zipfile import ZipFile
 import pandas as pd
 import glob
 from datetime import datetime
+import os
 
 
 def load_vid_info(info_files_path):
