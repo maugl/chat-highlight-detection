@@ -97,4 +97,4 @@ if __name__ == "__main__":
     if args.mode == "chat_messages":
         print(f"{datetime.now().strftime('%Y/%m/%d_%H:%M:%S')}: extracting chat messages...")
         make_corpus_dir(args.output)
-        extract_messages("../data/videos_chat/*_vids_chat.zip", args.output, vinf, v2i)
+        extract_messages("../data/videos_chat/*_vids_chat.zip", args.output, v_inf, v2i)
