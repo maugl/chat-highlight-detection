@@ -116,7 +116,7 @@ if __name__ == "__main__":
         }
         model = ScipyPeaks
     if args.baseline == "rtpp":
-        eval_params = eval_params_RTPP = {
+        eval_params = {
             "avg__kw_args": [
                 {"N": 5},
                 {"N": 50},
@@ -124,7 +124,7 @@ if __name__ == "__main__":
             ],
             "clf__lag": [25, 30, 35],
             "clf__threshold": [1, 2],
-            "clf__influence": [0.7],
+            "clf__influence": [0.7]
         }
         model = RealTimePeakPredictor
 
