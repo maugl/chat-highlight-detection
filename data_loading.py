@@ -89,11 +89,15 @@ class ChatHighlightData:
                     precomputed_message_density = self.get_chat_measure("message_density")
                 if measure_name == "emote_density":
                     if self.emotes is not None:
-                        vals[match] = measure(chat, self.emotes, self.window, self.step) / precomputed_message_density[match]
+                        a = measure(chat, self.emotes, self.window, self.step)
+                        b = precomputed_message_density[match]
+                        vals[match] = np.divide(a, b, out=np.zeros(a.shape, dtype=float), where=b != 0)
                     else:
                         raise Exception("No emotes loaded")
                 if measure_name == "copypasta_density":
-                    vals[match] = measure(chat, self.window, self.step) / precomputed_message_density[match]
+                    a = measure(chat, self.window, self.step)
+                    b = precomputed_message_density[match]
+                    vals[match] = np.divide(a, b, out=np.zeros(a.shape, dtype=float), where=b != 0)
             else:
                 vals[match] = measure(chat, self.window, self.step)
 
@@ -177,6 +181,7 @@ class ChatHighlightData:
     def set_frame_rate(self, frame_rate=30):
         # TODO recompute all measures
         pass
+
 
 def load_chat(chat_dir, file_identifier="*", load_random=None, random_state=None):
     chat_files = glob.glob("{}//{}.json".format(chat_dir, file_identifier))

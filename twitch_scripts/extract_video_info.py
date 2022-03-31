@@ -56,7 +56,7 @@ def extract_messages(chat_files_path, out_dir):
                     with open(f"{out_dir}/{video_id}.txt", "w") as out_file:
                         out_file.write("\n".join([msg["message"]["body"] for msg in vid_chat["comments"]]))
                     num_files_extracted += 1
-            if num_files_extracted%25 == 0:
+            if num_files_extracted%250 == 0:
                 print(f"{datetime.now().strftime('%Y/%m/%d_%H:%M:%S')}: extracted {num_files_extracted} chat files.")
                         
 
