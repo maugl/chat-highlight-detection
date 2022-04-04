@@ -1,0 +1,16 @@
+{
+  "spp": {
+    "shift": 0.4,
+    "scipy_params": {
+      "prominence": 0.14,
+      "width": [600, 5000],
+      "rel_height": 0.8
+    }
+  },
+  "rtpp": {
+    "lag": 30,
+    "threshold": 2.0,
+    "influence": 0.7,
+    "scale": 100
+  }
+}

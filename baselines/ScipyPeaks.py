@@ -25,7 +25,8 @@ class ScipyPeaks:
         self.set_params(shift=shift,
                         scipy_params=scipy_params,
                         prominence=prominence,
-                        width=width)
+                        width=width,
+                        rel_height=rel_height)
 
     def set_params(self, shift=None, scipy_params=None, prominence=None, width=None, rel_height=None):
         if scipy_params:
