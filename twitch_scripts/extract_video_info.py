@@ -102,4 +102,4 @@ if __name__ == "__main__":
     if args.mode == "chat_messages":
         print(f"{datetime.now().strftime('%Y/%m/%d_%H:%M:%S')}: extracting chat messages...")
         make_corpus_dir(args.output)
-        extract_messages(args.chat_files_path, args.output)
+        extract_messages(args.chat_files_path, args.output, args.bots_file_path)
