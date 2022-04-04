@@ -43,7 +43,12 @@ def load_vids_chat(chat_files_path, vid_info, vid2ind):
     return vid_info
 
 
-def extract_messages(chat_files_path, out_dir):
+def extract_messages(chat_files_path, out_dir, bots_file):
+    bot_ids = []
+    with open(bots_file, "r") as in_file:
+        bots = json.load(in_file)
+        bot_ids = [bot["id"] for bot in bots]
+
     chat_files = glob.glob(chat_files_path)
     num_files_extracted = 0
     for chat_file_name in chat_files:
@@ -54,7 +59,7 @@ def extract_messages(chat_files_path, out_dir):
                     vid_chat = json.load(in_file)
                     video_id = f_name.split("/")[-1].strip(".json")
                     with open(f"{out_dir}/{video_id}.txt", "w") as out_file:
-                        out_file.write("\n".join([msg["message"]["body"] for msg in vid_chat["comments"]]))
+                        out_file.write("\n".join([msg["message"]["body"] for msg in vid_chat["comments"] if msg["commenter"]["_id"] not in bot_ids]))
                     num_files_extracted += 1
             if num_files_extracted%250 == 0:
                 print(f"{datetime.now().strftime('%Y/%m/%d_%H:%M:%S')}: extracted {num_files_extracted} chat files.")
@@ -80,11 +85,12 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--chat_files_path", help="path where to load chat data from")
     parser.add_argument("-o", "--output", help="path where to save the extracted data")
     parser.add_argument("-m", "--mode", choices=["vid_info", "chat_messages"], help="Whch action to perform, if 'vid_info', a csv file with message counts and video information is created. If 'chat_messages', all the messages are extracted into text files, one message per line, one file per video and written.")
+    parser.add_argument("-b", "--bots_file_path", help="path where to load bot list from")
 
     # example run (chat messages):
-    # python3 extract_video_info -c "/home/mgut1/data/videos_chat/*_vids_chat.zip" -o /home/mgut1/data/videos_chat/corpus -m chat_messages
+    # python3 extract_video_info.py -c "/home/mgut1/data/videos_chat/*_vids_chat.zip" -o /home/mgut1/data/videos_chat/corpus -m chat_messages -b /home/home/mgut1/data/twitch_info/twitch_bots.json
     # test run (chat messages):
-    # python3 extract_video_info -c "/home/mgut1/data/videos_chat/lolpacific_vids_chat.zip" -o /home/mgut1/data/videos_chat/corpus -m chat_messages
+    # python3 extract_video_info -c "/home/mgut1/data/videos_chat/lolpacific_vids_chat.zip" -o /home/mgut1/data/videos_chat/corpus -m chat_messages -b /home/home/mgut1/data/twitch_info/twitch_bots.json
 
     args = parser.parse_args()
 

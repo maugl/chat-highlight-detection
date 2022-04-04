@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 import requests
 
-from credentials import client_id, client_secret
+from twitch_scripts.credentials import client_id, client_secret
 
 
 def authenticate(scopes=None):

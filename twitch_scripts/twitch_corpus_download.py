@@ -9,8 +9,8 @@ from datetime import datetime
 
 from lxml import html
 import requests
-from credentials import client_id
-from twitch_authentication import authenticate
+from twitch_scripts.credentials import client_id
+from twitch_scripts.twitch_authentication import authenticate
 
 from argparse import ArgumentParser
 
