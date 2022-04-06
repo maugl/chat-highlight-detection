@@ -40,7 +40,7 @@ def load_model():
         type_vocab_size=1,
     )
 
-    model = RobertaForMaskedLM(config=config)
+    return RobertaForMaskedLM(config=config)
 
 
 def load_data_set(path):
