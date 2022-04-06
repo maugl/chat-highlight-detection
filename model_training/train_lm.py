@@ -13,6 +13,7 @@ from tokenizers import ByteLevelBPETokenizer
 from tokenizers.processors import BertProcessing
 from tokenizers.pre_tokenizers import Whitespace
 
+
 def load_tokenizer(path):
     """
     tokenizer = ByteLevelBPETokenizer(
@@ -28,7 +29,7 @@ def load_tokenizer(path):
 
     tokenizer.pre_tokenizer = Whitespace()
     """
-    tokenizer_roberta = RobertaTokenizerFast.from_pretrained("./TwitchLeagueBert", max_len=512)
+    tokenizer_roberta = RobertaTokenizerFast.from_pretrained(path, max_len=512)
 
     return tokenizer_roberta
 
