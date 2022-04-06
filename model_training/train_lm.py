@@ -27,7 +27,14 @@ def load_tokenizer(path):
 
     tokenizer.pre_tokenizer = Whitespace()
 
-    tokenizer.mask_token = "<mask>"
+    tokenizer.pad = "<pad>"
+    tokenizer.bos_token = "<s>",
+    tokenizer.eos_token = "</s>",
+    tokenizer.sep_token = "</s>",
+    tokenizer.cls_token = "<s>",
+    tokenizer.unk_token = "<unk>",
+    tokenizer.pad_token = "<pad>",
+    tokenizer.mask_token = "<mask>",
 
     return tokenizer
 
