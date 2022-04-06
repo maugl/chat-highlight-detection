@@ -27,6 +27,8 @@ def load_tokenizer(path):
 
     tokenizer.pre_tokenizer = Whitespace()
 
+    tokenizer.mask_token = "<mask>"
+
     return tokenizer
 
 def load_model():
