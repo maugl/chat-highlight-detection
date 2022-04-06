@@ -14,6 +14,7 @@ from tokenizers.processors import BertProcessing
 from tokenizers.pre_tokenizers import Whitespace
 
 def load_tokenizer(path):
+    """
     tokenizer = ByteLevelBPETokenizer(
         f"{path.rstrip('/')}/vocab.json",
         f"{path.rstrip('/')}/merges.txt",
@@ -26,17 +27,10 @@ def load_tokenizer(path):
     tokenizer.enable_truncation(max_length=512)
 
     tokenizer.pre_tokenizer = Whitespace()
+    """
+    tokenizer_roberta = RobertaTokenizerFast.from_pretrained("./TwitchLeagueBert", max_len=512)
 
-    tokenizer.pad = "<pad>"
-    tokenizer.bos_token = "<s>",
-    tokenizer.eos_token = "</s>",
-    tokenizer.sep_token = "</s>",
-    tokenizer.cls_token = "<s>",
-    tokenizer.unk_token = "<unk>",
-    tokenizer.pad_token = "<pad>",
-    tokenizer.mask_token = "<mask>",
-
-    return tokenizer
+    return tokenizer_roberta
 
 def load_model():
     config = RobertaConfig(
