@@ -77,6 +77,8 @@ def train(model, tokenizer, dataset, output_dir):
 
     trainer.train(resume_from_checkpoint=True)
 
+    trainer.save_model()
+
 
 if __name__ == "__main__":
 
