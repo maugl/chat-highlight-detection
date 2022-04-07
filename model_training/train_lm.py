@@ -60,7 +60,7 @@ def train(model, tokenizer, dataset, output_dir):
 
     training_args = TrainingArguments(
         output_dir=output_dir,
-        overwrite_output_dir=True,
+        overwrite_output_dir=False,
         num_train_epochs=1,
         per_device_train_batch_size=64,
         save_steps=10_000,
@@ -75,9 +75,11 @@ def train(model, tokenizer, dataset, output_dir):
         train_dataset=dataset['train']
     )
 
-    trainer.train()
+    trainer.train(resume_from_checkpoint=True)
+
 
 if __name__ == "__main__":
+
     check_for_cuda()
 
     model_path = "/home/mgut1/data/LMtraining/TwitchLeagueBert"
