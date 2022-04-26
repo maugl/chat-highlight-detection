@@ -13,6 +13,9 @@ import datasets
 from datasets import load_dataset
 
 
+class CannotLoadTokenizer(Exception):
+    pass
+
 def train_tokenizer(ds, out_file_path):
     batch_size = 1000
 
@@ -38,8 +41,10 @@ def tokenize_dataset(tokenizer_files_path, ds):
 
 
 def load_tokenizer(path):
-    tokenizer_roberta = RobertaTokenizerFast.from_pretrained(path, max_len=512)
-
+    try:
+        tokenizer_roberta = RobertaTokenizerFast.from_pretrained(path, max_len=512)
+    except Exception as e:
+        raise CannotLoadTokenizer(e)
     return tokenizer_roberta
 
 
@@ -166,7 +171,7 @@ def main():
 
     try:
         tokenizer = load_tokenizer(model_path)
-    except OSError as e:
+    except CannotLoadTokenizer as e:
         # if there is no tokenizer, train it
         ds_text = load_huggingface_dataset(f"{data_path.rstrip('/')}/twitch_lol_combined.txt")
         train_tokenizer(ds=ds_text, out_file_path=model_path)
