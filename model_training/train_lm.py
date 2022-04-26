@@ -1,18 +1,13 @@
-from pathlib import Path
 from os.path import exists
 
 import torch
 
-import transformers
-from transformers import LineByLineTextDataset
 from transformers import DataCollatorForLanguageModeling
 from transformers import RobertaTokenizerFast
 from transformers import RobertaForMaskedLM
 from transformers import RobertaConfig
 from transformers import Trainer
 from transformers import TrainingArguments
-
-from transformers import FillMaskPipeline
 
 import datasets
 from datasets import load_dataset
@@ -112,8 +107,9 @@ def group_dataset(ds):
     )
 
 
-def group_texts(examples, block_size=128):
+def group_texts(examples, tokenizer, block_size=128):
     """
+    :param tokenizer:
     :param examples: DatasetDict containing fields with iterables to group
     :param block_size: maximum size of each group in items (tokens)
 
@@ -135,7 +131,7 @@ def group_texts(examples, block_size=128):
     if remainder > 0:
         for k in concatenated_examples.keys():
             if k == "input_ids":
-                result[k].append(concatenated_examples[k][-remainder:] + ([tokenizer.pad_token_id]* (block_size-remainder)))
+                result[k].append(concatenated_examples[k][-remainder:] + ([tokenizer.pad_token_id] * (block_size-remainder)))
             else:
                 result[k].append(concatenated_examples[k][-remainder:] + ([type(concatenated_examples[k][0])()] * (block_size-remainder)))
 
@@ -152,6 +148,7 @@ def load_data(m_path, d_path):
         if exists(f"{d_path.rstrip('/')}/corpus_tokenized_dataset"):
             dataset_tokenized = datasets.DatasetDict.load_from_disk(f"{d_path.rstrip('/')}/corpus_tokenized_dataset")
         else:
+            ds_text = load_huggingface_dataset(f"{d_path.rstrip('/')}/twitch_lol_combined.txt")
             dataset_tokenized = tokenize_dataset(ds=ds_text, tokenizer_files_path=m_path)
             dataset_tokenized.save_to_disk(f"{d_path.rstrip('/')}/corpus_tokenized_dataset")
         dataset_grouped = group_dataset(dataset_tokenized)
@@ -161,12 +158,11 @@ def load_data(m_path, d_path):
     return ds_lm
 
 
-if __name__ == "__main__":
-
+def main():
     check_for_cuda()
 
-    model_path = "/home/mgut1/data/LMtraining/TwitchLeagueBert"
-    data_path = ""
+    model_path = "/netscratch/gutsche/data/TwitchLeagueBert"
+    data_path = "/netscratch/gutsche/data/"
 
     try:
         tokenizer = load_tokenizer(model_path)
@@ -178,6 +174,10 @@ if __name__ == "__main__":
 
     dataset_lm = load_data(model_path, data_path)
 
-    model = load_model()
+    # model = load_model()
 
-    train(model, tokenizer, dataset_lm, model_path)
+    #train(model, tokenizer, dataset_lm, model_path)
+
+
+if __name__ == "__main__":
+    main()
