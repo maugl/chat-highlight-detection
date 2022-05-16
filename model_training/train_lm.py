@@ -89,18 +89,22 @@ def train(model_train, tokenizer_train, ds, output_dir):
     training_args = TrainingArguments(
         output_dir=output_dir,
         overwrite_output_dir=False,
-        num_train_epochs=1,
+        num_train_epochs=3,
         per_device_train_batch_size=64,
         save_steps=10_000,
-        save_total_limit=2,
-        prediction_loss_only=True
+        save_total_limit=4,
+        prediction_loss_only=True,
+        evaluation_strategy="steps",
+        eval_steps=5_000,
+        report_to="all"
     )
 
     trainer = Trainer(
         model=model_train,
         args=training_args,
         data_collator=data_collator,
-        train_dataset=ds['train']
+        train_dataset=ds['train'],
+        eval_dataset=ds['test']
     )
 
     trainer.train()
@@ -156,12 +160,15 @@ def group_texts(examples, tokenizer, block_size=128):
 def load_data(m_path, d_path, tokenizer):
     # load dataset from disk if it has been created before
     if exists(f"{d_path.rstrip('/')}/corpus_grouped_dataset"):
+        print("loading grouped dataset from disk")
         ds_lm = datasets.DatasetDict.load_from_disk(f"{d_path.rstrip('/')}/corpus_grouped_dataset")
     else:
         # load dataset from disk if it has been created before
         if exists(f"{d_path.rstrip('/')}/corpus_tokenized_dataset"):
+            print("loading tokenized dataset from disk")
             dataset_tokenized = datasets.DatasetDict.load_from_disk(f"{d_path.rstrip('/')}/corpus_tokenized_dataset")
         else:
+            print("loading text dataset from disk")
             ds_text = load_huggingface_dataset(f"{d_path.rstrip('/')}/twitch_lol_combined.txt")
             dataset_tokenized = tokenize_dataset(ds=ds_text, tokenizer_files_path=m_path)
             dataset_tokenized.save_to_disk(f"{d_path.rstrip('/')}/corpus_tokenized_dataset")
@@ -172,8 +179,12 @@ def load_data(m_path, d_path, tokenizer):
     return ds_lm
 
 
+def shuffle_split_dataset(ds):
+    return ds["train"].train_test_split(test_size=0.1)
+
+
 def main(arguments):
-    # check_for_cuda()
+    check_for_cuda()
 
     model_path = "/netscratch/gutsche/data/TwitchLeagueBert"
     data_path = "/netscratch/gutsche/data/"
@@ -190,13 +201,17 @@ def main(arguments):
 
     dataset_lm = load_data(model_path, data_path, tokenizer)
 
+    dataset_lm = shuffle_split_dataset(dataset_lm)
+
     if arguments.train_model:
         model = load_model()
 
         train(model, tokenizer, dataset_lm, model_path)
 
+
 def log_progress(log):
     print(json.dumps(log))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="train a tokenizer and language model for twitch chat data")
