@@ -2,46 +2,61 @@ from sklearn.preprocessing import MinMaxScaler
 from transformers import RobertaTokenizerFast
 import numpy as np
 from tqdm import tqdm
-from chat_measures import message_density
-from data_loading import ChatHighlightData
 import datasets
 from utils import moving_avg
+from chat_measures import message_density
+from data_loading import ChatHighlightData
 
 
 def prepare_data(chat_directory,
-                 higlight_directory,
+                 highlight_directory,
                  additional_features,
                  additional_features_args,
                  chunking_columns,
-                 tokenizer_name):
-    data = load_data(ch_dir=chat_directory, hl_dir=higlight_directory)
+                 tokenizer_name,
+                 max_input_len,
+                 train_identifier,
+                 val_identifier,
+                 test_identifier,
+                 seed):
+    print("data loading")
+    data = load_data(ch_dir=chat_directory, hl_dir=highlight_directory,
+                     train_identifier=train_identifier, val_identifier=val_identifier, test_identifier=test_identifier)
+    print("tokenization")
     data = tokenize(data, tokenizer_name)
+    print("temporal features")
     data = add_temporal_features(data, additional_features, additional_features_args)
+    print("data chunking")
     data = dataset_add_chunk_ids(data)
     # chunking_columns = ['highlights', 'input_ids', 'attention_mask', 'message_density_scaled']
     data = dataset_into_chunks(data, chunking_columns)
-    return data
+    print("data restructuring")
+    data = restructure_data_for_model(data, tokenizer_name=tokenizer_name, pad_to=max_input_len)
+    # shuffle data
+    data_shuffled = data.shuffle(seed=seed)
+    return data_shuffled
 
 
 # === DATA LOADING ===
-def load_data(ch_dir="./final_data/", hl_dir="./gt/"):
+def load_data(ch_dir="./final_data/", hl_dir="./gt/", train_identifier=None, val_identifier=None, test_identifier=None):
     chd_datasets = list()
-    for chd in load_chat_hl_data(ch_dir, hl_dir):
+    for chd in load_chat_hl_data(ch_dir, hl_dir, train_identifier=train_identifier, val_identifier=val_identifier,
+                                 test_identifier=test_identifier):
         chd_datasets.append(chat_highlight_data_to_huggingface_dataset(chd))
     return create_dataset_dict(["train", "val", "test"], chd_datasets)
 
 
-def load_chat_hl_data(ch_dir, hl_dir):
+def load_chat_hl_data(ch_dir, hl_dir, train_identifier, val_identifier, test_identifier):
     chd_train = ChatHighlightData(chat_dir=ch_dir, highlight_dir=hl_dir, emote_dir=None, frame_rate=30)
-    chd_train.load_data(file_identifier="nalcs_w*_g[13]")
+    chd_train.load_data(file_identifier=train_identifier)
     chd_val = ChatHighlightData(chat_dir=ch_dir, highlight_dir=hl_dir, emote_dir=None, frame_rate=30)
-    chd_val.load_data(file_identifier="nalcs_w[1-4]*_g2")
+    chd_val.load_data(file_identifier=val_identifier)
     chd_test = ChatHighlightData(chat_dir=ch_dir, highlight_dir=hl_dir, emote_dir=None, frame_rate=30)
-    chd_test.load_data(file_identifier="nalcs_w[5-9]*_g2")
+    chd_test.load_data(file_identifier=test_identifier)
 
-    assert(sorted(chd_train.chat.keys()) == sorted(chd_train.highlights.keys()))
-    assert(sorted(chd_val.chat.keys()) == sorted(chd_val.highlights.keys()))
-    assert(sorted(chd_test.chat.keys()) == sorted(chd_test.highlights.keys()))
+    assert (sorted(chd_train.chat.keys()) == sorted(chd_train.highlights.keys()))
+    assert (sorted(chd_val.chat.keys()) == sorted(chd_val.highlights.keys()))
+    assert (sorted(chd_test.chat.keys()) == sorted(chd_test.highlights.keys()))
 
     return chd_train, chd_val, chd_test
 
@@ -97,7 +112,7 @@ def add_temporal_features(dataset, additional_features, additional_features_args
         # compute feature
         dataset = datasets.DatasetDict(
             {
-                ds: dataset[ds].add_column(name=feature, column=feature_func(dataset[ds]), **args)for ds in dataset
+                ds: dataset[ds].add_column(name=feature, column=feature_func(dataset[ds], **args)) for ds in dataset
             })
 
         # scale feature
@@ -122,7 +137,8 @@ def scale_temporal_measure(column_name, dataset):
     return ds_messages_chunked_tempfeat_scld
 
 
-def msg_dens_dataset(ds):
+def msg_dens_dataset(ds, window_size, step_size, mvg_avg_N):
+    print("msg_dens_dataset", ds)
     match_name = ds["match_name"]
     prev = ds["match_name"][0]
     prev_cut = 0
@@ -131,11 +147,13 @@ def msg_dens_dataset(ds):
     for i in range(len(match_name)):
         val = match_name[i]
         if prev != val:
-            md = moving_avg(message_density(messages[prev_cut:i]), N=1000)
+            md = moving_avg(message_density(messages[prev_cut:i], window_size=window_size, step_size=step_size),
+                            N=mvg_avg_N)
             msg_dens.extend(md)
             prev_cut = i
         prev = val
-    msg_dens.extend(moving_avg(message_density(messages[prev_cut:i+1]), N=1000))
+    msg_dens.extend(moving_avg(message_density(messages[prev_cut:i + 1], window_size=window_size, step_size=step_size),
+                               N=mvg_avg_N))
     return msg_dens
 
 
@@ -201,10 +219,9 @@ def pre_calculate_chunk_borders(cids):
 
 
 def generate_frame_ids_from_chunks(ds,
-                                   window_size = 2,
-                                   context_size = (1,1), # before, after
-                                   step_size = 2):
-
+                                   window_size=2,
+                                   context_size=(1, 1),  # before, after
+                                   step_size=2):
     chunk_ids = np.asarray(ds["chunk_id"])
     chunks = list(sorted(set(ds["chunk_id"])))
 
@@ -214,33 +231,34 @@ def generate_frame_ids_from_chunks(ds,
     # starting a new chunk every step_size
     # window_size also plays a role in how many sequences we can fit
     last_seq = int(len(chunks) % step_size != 0)
-    num_sequences = int(len(chunks)/step_size) + last_seq
-    num_sequences += 1 # plus one because of the first half-sequence
+    num_sequences = int(len(chunks) / step_size) + last_seq
+    num_sequences += 1  # plus one because of the first half-sequence
 
     chunk_borders_pre = pre_calculate_chunk_borders(chunk_ids)
     sequence_ids = np.zeros((num_sequences, window_size + sum(context_size) + 1), dtype=int)
     # first half-sequence
     # overhang at beginning and end may be a problem for more than one sequence
     hanging_chunks = list(range(min(chunks), min(chunks) + sum(context_size)))
-    sequence_ids[0][-len(hanging_chunks):]  = [chunk_borders_pre[i] for i in hanging_chunks]
-    sequence_ids[0][-len(hanging_chunks)-1] = 0
-    sequence_ids[0][:-(len(hanging_chunks)+1)] = -1
+    sequence_ids[0][-len(hanging_chunks):] = [chunk_borders_pre[i] for i in hanging_chunks]
+    sequence_ids[0][-len(hanging_chunks) - 1] = 0
+    sequence_ids[0][:-(len(hanging_chunks) + 1)] = -1
 
-    for i in range(0, num_sequences-1-last_seq):
-        curr_seq_chunk_ids = chunks[i*step_size:i*step_size+sequence_length]
-        sequence_ids[i+1][0] = chunk_borders_pre[chunks[i*step_size-1]] # start one chunk border earlier to include the first chunk of the series
+    for i in range(0, num_sequences - 1 - last_seq):
+        curr_seq_chunk_ids = chunks[i * step_size:i * step_size + sequence_length]
+        sequence_ids[i + 1][0] = chunk_borders_pre[
+            chunks[i * step_size - 1]]  # start one chunk border earlier to include the first chunk of the series
         try:
-            sequence_ids[i+1][1:] = [chunk_borders_pre[c] for c in curr_seq_chunk_ids]
+            sequence_ids[i + 1][1:] = [chunk_borders_pre[c] for c in curr_seq_chunk_ids]
         except ValueError:
             # in case we overhang on last sequence(s) we can add empty chunks
             chk_brds = [chunk_borders_pre[c] for c in curr_seq_chunk_ids]
             # make chunk "empty" by adding in last index multiple times
-            sequence_ids[i+1][1:] = chk_brds + [chk_brds[-1]] * (sequence_length - len(chk_brds))
+            sequence_ids[i + 1][1:] = chk_brds + [chk_brds[-1]] * (sequence_length - len(chk_brds))
     # last sequence if it
     if last_seq > 0:
-        sequence_ids[-1][:len(chunks)-(num_sequences-2)*step_size] = [chunk_borders_pre[c] for c in chunks[(num_sequences-2)*step_size:]] # last sequence (may be half empty)
+        sequence_ids[-1][:len(chunks) - (num_sequences - 2) * step_size] = [chunk_borders_pre[c] for c in chunks[(num_sequences - 2) * step_size:]]  # last sequence (may be half empty)
 
-    sequence_ids[1][0] = 0 # hard coded solution for wrapping back around the list with 1st element
+    sequence_ids[1][0] = 0  # hard coded solution for wrapping back around the list with 1st element
     # if window_size is larger, this may affect more than one element
     # better: check if indices are out of order. Set highger ones to 0
     return sequence_ids
@@ -310,6 +328,49 @@ def sequence_chunk_data(ds, cols):
     return datasets.Dataset.from_dict(ds_new_data)
 
 
+# === DS RESTRUCTURING ===
+def restructure_data_for_model(ds, tokenizer_name, pad_to):
+    tokenizer = RobertaTokenizerFast.from_pretrained(tokenizer_name)
+    ds = ds.map(lambda examples: compute_labels(examples))
+    ds = ds.map(lambda examples: compute_additional_features(examples))
+    ds = ds.map(lambda examples: pad_truncate_to_max_sequence_length(examples, tokenizer.pad_token_id, pad_to))
+    return ds
+
+
+def compute_labels(ex, context_size=(1, 1)):
+    return {"hl_labels": np.asarray(ex["highlights"][context_size[0]: -context_size[1]], dtype=float)}
+
+"""
+            "additional_labels": np.concatenate(
+                [ex["hl_dist_prev_disc"], ex["hl_dist_next_disc"], ex["hl_dist_start_disc"], ex["hl_dist_stop_disc"]],
+                axis=-1)}
+"""
+
+
+def compute_additional_features(ex):
+    return {"additional_features": ex["message_density_scaled"]}
+
+
+def pad_truncate_to_max_sequence_length(ex, pad_token_id, pad_to):
+    assert len(ex["input_ids"]) == len(ex["attention_mask"])
+
+    if len(ex["input_ids"]) >= pad_to:
+        # truncate
+        return {
+            "input_ids": np.asarray(ex["input_ids"][:pad_to], dtype=float),
+            "attention_mask": np.asarray(ex["attention_mask"][:pad_to], dtype=float)
+        }
+    else:
+        # pad
+        return {
+            "input_ids": np.concatenate([ex["input_ids"], np.full((pad_to - len(ex["input_ids"])), pad_token_id)],
+                                        axis=-1).astype(np.float),
+            "attention_mask": np.concatenate([ex["attention_mask"], np.full((pad_to - len(ex["attention_mask"])), 0)],
+                                             axis=-1).astype(np.float)
+        }
+
+
+
 # this is at the end of the document to provide global variables which can access functions
 AVAILABLE_FEATURE_FUNCTIONS = {
     "message_density": msg_dens_dataset
@@ -323,4 +384,3 @@ AVAILABLE_CHUNKING_FUNCTIONS = {
 # do something similar for _disc colums
 for func in AVAILABLE_FEATURE_FUNCTIONS.keys():
     AVAILABLE_CHUNKING_FUNCTIONS[f"{func}_scaled"] = mean_over_sequences
-
