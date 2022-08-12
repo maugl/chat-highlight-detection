@@ -1,4 +1,6 @@
 import argparse
+import os
+import shutil
 from os.path import exists
 import json
 
@@ -13,7 +15,12 @@ from transformers import TrainingArguments
 
 import datasets
 from datasets import load_dataset
+
+from FileWriterCallback import FileWriterCallback
+
 datasets.disable_caching()
+
+from hub_token import HUB_TOKEN
 
 
 class CannotLoadTokenizer(Exception):
@@ -83,14 +90,15 @@ def train(model_train, tokenizer_train, ds, output_dir):
     :param output_dir:
     :return:
     """
+
     data_collator = DataCollatorForLanguageModeling(
         tokenizer=tokenizer_train, mlm=True, mlm_probability=0.15
     )
 
     training_args = TrainingArguments(
         output_dir=output_dir,
-        overwrite_output_dir=False,
-        num_train_epochs=25,
+        overwrite_output_dir=True,
+        num_train_epochs=20,
         per_device_train_batch_size=64,
         save_steps=20_000,
         save_total_limit=4,
@@ -99,7 +107,11 @@ def train(model_train, tokenizer_train, ds, output_dir):
         logging_steps=500,
         eval_steps=20_000,
         report_to="all",
-        load_best_model_at_end=True
+        load_best_model_at_end=True,
+
+        push_to_hub=True,
+        hub_model_id="twitch-league-roberta-base-test",
+        hub_token=HUB_TOKEN
     )
 
     trainer = Trainer(
@@ -108,20 +120,28 @@ def train(model_train, tokenizer_train, ds, output_dir):
         data_collator=data_collator,
         train_dataset=ds['train'],
         eval_dataset=ds['test'],
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=3)]
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=3),
+                   FileWriterCallback(log_file_path="/tmp/ml_train_logs/", write_interval=0, log_file_final_path="/netscratch/gutsche/logs/")]
     )
 
     trainer.train()
 
     trainer.save_model()
+    try:
+        trainer.save_state()
+    except Exception as e:
+        print("cannot save trainer state")
+        print(e)
 
     # https://stackoverflow.com/questions/68806265/huggingface-trainer-logging-train-data
-    with open(f"{trainer.args.logging_dir}/log_history.json", "w") as out_file:
+    with open(f"{output_dir.rstrip('/')}/log_history_.json", "w") as out_file:
         json.dump(trainer.state.log_history, out_file, indent=4)  # might have to change this to copy back to storage
 
+    """
     final_eval = trainer.evaluate()
     with open(f"{output_dir}/final_eval.txt", "w") as out_file:
         out_file.write(str(final_eval))
+    """
 
 
 def group_dataset(ds, tker):
@@ -137,7 +157,7 @@ def group_dataset(ds, tker):
     return grouped_ds
 
 
-def group_texts(examples, tokenizer, block_size=128):
+def group_texts(examples, tokenizer, block_size=512):
     """
     :param tokenizer:
     :param examples: DatasetDict containing fields with iterables to group
@@ -169,7 +189,7 @@ def group_texts(examples, tokenizer, block_size=128):
     return result
 
 
-def load_data(m_path, d_path, tokenizer):
+def load_data(tok_path, d_path, tokenizer):
     # load dataset from disk if it has been created before
     if exists(f"{d_path.rstrip('/')}/corpus_grouped_dataset"):
         print("loading grouped dataset from disk")
@@ -182,7 +202,7 @@ def load_data(m_path, d_path, tokenizer):
         else:
             print("loading text dataset from disk")
             ds_text = load_huggingface_dataset(f"{d_path.rstrip('/')}/twitch_lol_combined.txt")
-            dataset_tokenized = tokenize_dataset(ds=ds_text, tokenizer_files_path=m_path)
+            dataset_tokenized = tokenize_dataset(ds=ds_text, tokenizer_files_path=tok_path)
             dataset_tokenized.save_to_disk(f"{d_path.rstrip('/')}/corpus_tokenized_dataset")
         dataset_grouped = group_dataset(dataset_tokenized, tokenizer)
         dataset_grouped.save_to_disk(f"{d_path.rstrip('/')}/corpus_grouped_dataset")
@@ -195,31 +215,53 @@ def shuffle_split_dataset(ds, seed):
     return ds["train"].train_test_split(test_size=0.1, seed=seed)
 
 
-def main(train_model=False, seed=42069):
+def main(train_model=False, seed=42069, model_path="/tmp/model/TwitchLeagueBert", data_path="/tmp/data/", output_path=None, load_data_from_hub=None):
+    """
+    :param train_model: if true the model is trained, only dataset preparation otherwise
+    :param seed: seed for data shuffling and model initialization
+    :param model_path: where to load tokenizer from
+    :param data_path: where to load data from
+    :param output_path: where to save model to
+    :return:
+    """
     check_for_cuda()
 
-    model_path = "/tmp/model/TwitchLeagueBert"
-    data_path = "/tmp/data/"
+    tokenizer_output = f"{output_path.rstrip('/')}/TwitchLeagueBert"
+
+    try:
+        os.makedirs(tokenizer_output)
+    except FileExistsError as e:
+        pass
 
     try:
         print("load tokenizer from disk")
         tokenizer = load_tokenizer(model_path)
+        tokenizer.save_pretrained(tokenizer_output)
+        # tokenizer_output = model_path
     except CannotLoadTokenizer as e:
         # if there is no tokenizer, train it
         print("load dataset from text file")
         ds_text = load_huggingface_dataset(f"{data_path.rstrip('/')}/twitch_lol_combined.txt")
-        train_tokenizer(ds=ds_text, out_file_path=model_path)
-        tokenizer = load_tokenizer(model_path)
+        train_tokenizer(ds=ds_text, out_file_path=tokenizer_output)
+        tokenizer = load_tokenizer(tokenizer_output)
 
-    dataset_lm = load_data(model_path, data_path, tokenizer)
+    if load_data_from_hub:
+        dataset_lm_shuffled = datasets.load_dataset(load_data_from_hub, use_auth_token=HUB_TOKEN)
+    else:
+        dataset_lm = load_data(tokenizer_output, data_path, tokenizer)
 
-    dataset_lm_shuffled = shuffle_split_dataset(dataset_lm, seed=seed)
-    dataset_lm_shuffled.save_to_disk(f"{data_path.rstrip('/')}/ds_mlm_training_twitch_LOL")
+        dataset_lm_shuffled = shuffle_split_dataset(dataset_lm, seed=seed)
+        dataset_lm_shuffled.save_to_disk(f"{data_path.rstrip('/')}/ds_mlm_training_twitch_LOL")
+        dataset_lm_shuffled.push_to_hub("Epidot/twitch_lol_corpus_for_mlm_training", token=HUB_TOKEN, private=True)
+
+    try:
+        shutil.copytree(f"{data_path.rstrip('/')}/ds_mlm_training_twitch_LOL", f"{output_path}/ds_mlm_training_twitch_LOL")
+    except Exception as e:
+        print("cannot copy data to storage")
 
     if train_model:
         model = load_model()
-
-        train(model, tokenizer, dataset_lm_shuffled, "/tmp/run/training/")
+        train(model, tokenizer, dataset_lm_shuffled, f"{output_path.rstrip('/')}/TwitchLeagueBert")
 
 
 def log_progress(log):

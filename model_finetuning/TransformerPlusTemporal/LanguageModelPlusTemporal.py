@@ -22,10 +22,10 @@ class LanguageModelPlusTemporal(torch.nn.Module):
         self.l1 = RobertaModel.from_pretrained(lm_path)
         self.d1 = torch.nn.Dropout(0.3)
         self.l3 = torch.nn.Linear(128 + self.additional_features_size,
-                                  1024)  # should be model_output_size (sequence length) + additional_features_size
+                                  4096)  # should be model_output_size (sequence length) + additional_features_size
         # maybe I should translate the additional features to a bigger
         # vectorspace so that they do not get drowned out by the sequence representation
-        self.l41 = torch.nn.Linear(1024, window_size)
+        self.l41 = torch.nn.Linear(4096, window_size)
         # for each chunk in a sequence we have num_distcategories and each category has num_dist_steps number of discrete labels
         # self.l42 = torch.nn.Linear(1024, sequence_length)  # might have to add more here for each class and possible value
         # l42: maybe combine in-highlight output and outside-highlight output

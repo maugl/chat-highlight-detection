@@ -11,8 +11,8 @@ from sklearn.preprocessing import MinMaxScaler
 
 from utils import highlight_span
 from utils import moving_avg
-import RealTimePeakPredictor
-import ScipyPeaks
+from RealTimePeakPredictor import RealTimePeakPredictor
+from ScipyPeaks import ScipyPeaks
 from chat_measures import message_density
 from data_loading import load_chat, load_highlights, remove_missing_matches, cut_same_length
 

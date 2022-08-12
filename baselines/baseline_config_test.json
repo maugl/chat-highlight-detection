@@ -1,10 +1,10 @@
 {
   "spp": {
-    "shift": 0.4,
+    "shift": 0.3,
     "scipy_params": {
       "prominence": 0.14,
       "width": [600, 5000],
-      "rel_height": 0.8
+      "rel_height": 0.7
     }
   },
   "rtpp": {

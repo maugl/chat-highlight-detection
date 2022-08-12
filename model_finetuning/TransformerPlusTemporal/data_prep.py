@@ -1,4 +1,4 @@
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.preprocessing import StandardScaler
 from transformers import RobertaTokenizerFast
 import numpy as np
 from tqdm import tqdm
@@ -26,6 +26,9 @@ def prepare_data(chat_directory,
     data = tokenize(data, tokenizer_name)
     print("temporal features")
     data = add_temporal_features(data, additional_features, additional_features_args)
+    print("oversample")
+    train_oversampled = over_sample_binary(data["train"])
+    data["train"] = train_oversampled
     print("data chunking")
     data = dataset_add_chunk_ids(data)
     # chunking_columns = ['highlights', 'input_ids', 'attention_mask', 'message_density_scaled']
@@ -99,6 +102,27 @@ def split_add_bos_eos(example, tok):
     return {"messages_split": f"{tok.eos_token}{tok.bos_token}".join(example["messages"].rstrip("\n").split("\n"))}
 
 
+# === BALANCE DATASET ===
+def over_sample_binary(ds):
+    label = np.asarray(ds["highlights"])
+    class_counts = (abs(label.size - label.sum()).astype(int), label.sum().astype(int))
+    smaller_class = np.argmin(class_counts)
+
+    print(class_counts, smaller_class)
+
+    ratio = abs((len(label) - class_counts[smaller_class]) / (class_counts[smaller_class]) - 1)
+    print(ratio)
+    smlclss_inds = np.where(label == smaller_class)[0]
+    target = round(class_counts[smaller_class] * ratio)
+
+    new_data = datasets.Dataset.from_dict({k: np.repeat(v, ratio, axis=0) for k, v in ds[smlclss_inds].items()})
+    print("new_data_done")
+    new_data_remainder = datasets.Dataset.from_dict({k: np.asarray(v) for k, v in ds[smlclss_inds[:target - len(new_data["highlights"])]].items()})
+    print("new_data_remainder done")
+
+    return datasets.concatenate_datasets([ds, new_data, new_data_remainder])
+
+
 # === ADDITIONAL FEATURES ===
 def add_temporal_features(dataset, additional_features, additional_features_args):
     for feature in additional_features:
@@ -123,7 +147,7 @@ def add_temporal_features(dataset, additional_features, additional_features_args
 
 def scale_temporal_measure(column_name, dataset):
     # maybe we want to save the scaler to use on future dataset
-    scaler = MinMaxScaler()
+    scaler = StandardScaler()
     ds_messages_chunked_tempfeat_scld = datasets.DatasetDict()
     ds_messages_chunked_tempfeat_scld["train"] = dataset["train"].add_column(
         name=f"{column_name}_scaled", column=scaler.fit_transform(

@@ -38,6 +38,7 @@ def copy_data_to_node():
     except FileExistsError:
         pass
     shutil.copy("/netscratch/gutsche/data/twitch_lol_combined.txt", "/tmp/data/")
+    shutil.copytree("/netscratch/gutsche/data/corpus_grouped_dataset", "/tmp/data/corpus_grouped_dataset")
 
     try:
         os.mkdir("/tmp/run/")
@@ -45,19 +46,36 @@ def copy_data_to_node():
         pass
 
 
+"""
 @ex.capture
 def copy_data_to_storage(run_id, run_name):
     # we use ./my_experiment.py -F run/output/sacred as logging directory
     # implementation specific to SLURM cluster setup
-    results_dir = f"/netscratch/gutsche/data/mlm_training/results/{run_id}_{run_name}"
+    results_dir = f"/netscratch/gutsche/data/mlm_training/{run_id}"
     try:
-        os.makedirs(results_dir)
+        # os.makedirs(results_dir)
+        pass
     except FileExistsError:
         pass
-    shutil.copytree("/tmp/run/output/", f"{results_dir}/output/{run_id}_{run_name}")
-    shutil.copytree("/tmp/run/training/", f"{results_dir}/training/{run_id}_{run_name}")
-    #shutil.copytree(f"/tmp/data/ds_{run_id}_{run_name}", f"{results_dir}/output/ds_{run_id}_{run_name}")
-
+    try:
+        # os.makedirs(f"{results_dir}/output/")
+        shutil.copytree("/tmp/run/output/", f"{results_dir}/output/")
+    except Exception as e:
+        print("cannot copy run output")
+        print(e)
+    try:
+        # os.makedirs(f"{results_dir}/training/")
+        shutil.copytree("/tmp/run/training/", f"{results_dir}/training/")
+    except Exception as e:
+        print("cannot copy run training")
+        print(e)
+    try:
+        # os.makedirs(f"{results_dir}/model/TwitchLeagueBert/")
+        shutil.copytree("/tmp/run_mlm/TwitchLeagueBert/", f"{results_dir}/model/TwitchLeagueBert")
+    except Exception as e:
+        print("cannot copy model")
+        print(e)
+"""
 
 @ex.automain
 def run_training(run_id,
@@ -66,13 +84,18 @@ def run_training(run_id,
                  ):
     copy_data_to_node()
 
+    out_dir = f"/netscratch/gutsche/data/{run_name}_{run_id}"
+
     try:
         # model training
         print("preparing data / training model")
-        train_lm.main(train_model=True, seed=_seed)
+        train_lm.main(train_model=True,
+                      seed=_seed,
+                      model_path="/tmp/model/TwitchLeagueBert",
+                      data_path="/tmp/data/",
+                      output_path=out_dir,
+                      load_data_from_hub="Epidot/twitch_lol_corpus_for_mlm_training")
         print("model training complete")
     except Exception as e:
         print("Error in train_model")
         print(e)
-
-    copy_data_to_storage()
