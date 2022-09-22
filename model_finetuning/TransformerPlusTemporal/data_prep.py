@@ -6,6 +6,7 @@ import datasets
 from utils import moving_avg
 from chat_measures import message_density
 from data_loading import ChatHighlightData
+from hub_token import HUB_TOKEN
 
 
 def prepare_data(chat_directory,
@@ -18,17 +19,27 @@ def prepare_data(chat_directory,
                  train_identifier,
                  val_identifier,
                  test_identifier,
-                 seed):
-    print("data loading")
-    data = load_data(ch_dir=chat_directory, hl_dir=highlight_directory,
-                     train_identifier=train_identifier, val_identifier=val_identifier, test_identifier=test_identifier)
-    print("tokenization")
-    data = tokenize(data, tokenizer_name)
-    print("temporal features")
-    data = add_temporal_features(data, additional_features, additional_features_args)
-    print("oversample")
-    train_oversampled = over_sample_binary(data["train"])
-    data["train"] = train_oversampled
+                 seed,
+                 ds_intermediate):
+    if ds_intermediate:
+        data = datasets.load_dataset(ds_intermediate, use_auth_token=HUB_TOKEN)
+    else:
+        print("data loading")
+        data = load_data(ch_dir=chat_directory, hl_dir=highlight_directory,
+                         train_identifier=train_identifier, val_identifier=val_identifier, test_identifier=test_identifier)
+        print("tokenization")
+        data = tokenize(data, tokenizer_name)
+        print("temporal features")
+        data = add_temporal_features(data, additional_features, additional_features_args)
+        print("oversample")
+        train_oversampled = over_sample_binary(data["train"])
+        data["train"] = train_oversampled
+        print("copying highlights raw")
+        copy_args = {"cname": "highlights", "cname_new": "highlights_raw"}
+        data = data.map(copy_column, fn_kwargs=copy_args)
+        lm_name = tokenizer_name.split('/')[-1][:10]
+        data.push_to_hub(f"Epidot/private_fuetal2017_highlights_temporal_preprocessed_{lm_name}_oversampled_intermediate", private=True, token=HUB_TOKEN)
+
     print("data chunking")
     data = dataset_add_chunk_ids(data)
     # chunking_columns = ['highlights', 'input_ids', 'attention_mask', 'message_density_scaled']
@@ -182,6 +193,10 @@ def msg_dens_dataset(ds, window_size, step_size, mvg_avg_N):
 
 
 # === CHUNKING ===
+def copy_column(example, cname, cname_new):
+    example[cname_new] = example[cname]
+    return example
+
 def dataset_add_chunk_ids(ds):
     ds_messages_tok_count = ds.map(
         lambda examples: {"tok_count": [len(ex) for ex in examples["input_ids"]]}, batched=True)
@@ -330,9 +345,11 @@ def sequence_chunk_data(ds, cols):
     :return:
     """
     ds_new_data = dict()
+
     seq_ids = generate_frame_ids_from_chunks(ds)
     for c in cols:
         data = ds[c]
+        print(c)
 
         # select correct aggregation function
         if c in AVAILABLE_CHUNKING_FUNCTIONS:

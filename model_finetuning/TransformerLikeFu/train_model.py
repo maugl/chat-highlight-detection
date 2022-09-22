@@ -25,10 +25,11 @@ def train_model(dataset, tokenizer_path, lm_path, run_id, output_dir):
         per_device_eval_batch_size=16,
         save_steps=20000,
         save_total_limit=4,
-        evaluation_strategy=IntervalStrategy("steps"),
-        eval_steps=20000,
+        evaluation_strategy=IntervalStrategy("epoch"),
+        save_strategy=IntervalStrategy("epoch"),
+        # eval_steps=20000,
         logging_steps=500,
-        num_train_epochs=10,
+        num_train_epochs=25,
         weight_decay=0.01,
         load_best_model_at_end=True,
         metric_for_best_model="f1",
@@ -36,7 +37,7 @@ def train_model(dataset, tokenizer_path, lm_path, run_id, output_dir):
         label_names=["labels"],
 
         push_to_hub=True,
-        hub_model_id=f"{lm_path}-finetuned-highlight-detection",  # optional, will default to the name of your output directory
+        hub_model_id=f"{lm_path}-finetuned-highlight-detection-epochs",  # optional, will default to the name of your output directory
         hub_token=HUB_TOKEN
     )
 

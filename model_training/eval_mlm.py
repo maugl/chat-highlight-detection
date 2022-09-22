@@ -23,7 +23,7 @@ def save_evaluation_results(eval_res, path):
 
 def load_trainer(ds, tok):
     data_collator = DataCollatorForLanguageModeling(
-      tokenizer=tok, mlm=True, mlm_probability=0.15
+        tokenizer=tok, mlm=True, mlm_probability=0.15
     )
 
     training_args = TrainingArguments(
@@ -63,9 +63,9 @@ if __name__ == "__main__":
         print(vars(args))
         exit(0)
 
-    dataset = datasets.load_from_disk(args.data_path)
     tokenizer = RobertaTokenizerFast.from_pretrained(args.model_specifier)
     model = RobertaForMaskedLM.from_pretrained(args.model_specifier)
+    dataset = datasets.load_from_disk(args.data_path)
 
     evaluation_result = eval_model(model, dataset, tokenizer)
     save_evaluation_results(evaluation_result, args.results_path)

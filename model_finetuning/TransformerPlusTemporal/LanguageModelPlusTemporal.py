@@ -19,6 +19,7 @@ class LanguageModelPlusTemporal(torch.nn.Module):
         self.loss1_ratio = main_loss_ratio
         self.loss2_ratio = 1 - main_loss_ratio
         self.pos_label_ratio = torch.Tensor([pos_label_ratio]).to(device)
+        # layers
         self.l1 = RobertaModel.from_pretrained(lm_path)
         self.d1 = torch.nn.Dropout(0.3)
         self.l3 = torch.nn.Linear(128 + self.additional_features_size,
@@ -36,14 +37,16 @@ class LanguageModelPlusTemporal(torch.nn.Module):
         # alterntively use pooled output
         output_1_average = torch.mean(output_1.last_hidden_state, axis=-1)
         # concatenate sequence representation with additional temporal features
-        input_2 = torch.cat(tensors=(output_1_average, additional_features), axis=-1)
-        # dropout
-        output_2 = self.d1(input_2)
+        input_3 = torch.cat(tensors=(output_1_average, additional_features), axis=-1)
         # linear
-        output_3 = self.l3(output_2)
+        output_3 = self.l3(input_3)
+        # activation
+        output_3_act = torch.tanh(output_3)
+        # dropout
+        output_3_drop = self.d1(output_3_act)
         # for binary classification of main objective
         # define to return
-        output = self.l41(output_3)
+        output = self.l41(output_3_drop)
         # for multiclass classification of additional objective
         # output_42 = self.l42(output_3)
         # outputs = [output_41, output_42]
@@ -54,9 +57,9 @@ class LanguageModelPlusTemporal(torch.nn.Module):
         if hl_labels is not None:
             loss = self._get_loss(output, hl_labels)
             return {"loss": loss,
-                    "logits": torch.sigmoid(output)}
+                    "logits": output}
 
-        return {"logits": torch.sigmoid(output)}
+        return {"logits": output}
 
     def _get_loss(self, outputs, targets):
         """
@@ -66,7 +69,14 @@ class LanguageModelPlusTemporal(torch.nn.Module):
         # does this actually do what I want?
         # compute losses for n (window_size) outputs?
         # we can add weighing for the much smaller positive class with pos_weight
+        # MSELoss()
+        """
         loss1 = torch.nn.BCEWithLogitsLoss(pos_weight=self.pos_label_ratio)(
             torch.reshape(outputs, (outputs.shape[0] * self.window_size, 1)),
+            torch.reshape(targets, (targets.shape[0] * self.window_size, 1)))  # keep as is
+        """
+        outputs = torch.sigmoid(torch.reshape(outputs, (outputs.shape[0] * self.window_size, 1)))
+        loss1 = torch.nn.MSELoss()(
+            outputs,
             torch.reshape(targets, (targets.shape[0] * self.window_size, 1)))  # keep as is
         return loss1

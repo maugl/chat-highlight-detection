@@ -37,10 +37,11 @@ def train_model(dataset,
         num_train_epochs=25,
         per_device_train_batch_size=16,
         per_device_eval_batch_size=16,
-        save_steps=3000,
+        # save_steps=3000,
         save_total_limit=4,
-        evaluation_strategy=IntervalStrategy("steps"),
-        eval_steps=3000,
+        evaluation_strategy=IntervalStrategy("epoch"),
+        save_strategy=IntervalStrategy("epoch"),
+        # eval_steps=3000,
         logging_steps=500,
         report_to=["all"],
         label_names=["hl_labels"],  # , "objective_simple"]
@@ -48,7 +49,7 @@ def train_model(dataset,
         metric_for_best_model="f1",
         greater_is_better=True,
         push_to_hub=True,
-        hub_model_id=f"{lm_path.split('/')[-1]}-finetuned-highlight-detection-plus-temporal",
+        hub_model_id=f"{lm_path.split('/')[-1]}-finetuned-highlight-detection-plus-temporal-epochs",
         # optional, will default to the name of your output directory
         hub_token=HUB_TOKEN
     )

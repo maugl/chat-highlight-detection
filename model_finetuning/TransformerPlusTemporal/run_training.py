@@ -43,12 +43,13 @@ def setup_config():
             "mvg_avg_N": 1000
         }
     }
-    chunking_columns = ['highlights', 'input_ids', 'attention_mask'] + [af + "_scaled" for af in additional_features]
+    chunking_columns = ['highlights', 'input_ids', 'attention_mask'] + [af + "_scaled" for af in additional_features] + ["highlights_raw"]
     run_id = uuid.uuid4()
     run_name = "TransformerPlusTemporal"
     precomputed_dataset_path = None
     ds_name_hub = None
     do_training = True
+    ds_intermediate = None
 
 
 # copy data to node once, use there
@@ -149,7 +150,8 @@ def run_training(data_path,
                  _seed,
                  precomputed_dataset_path,
                  ds_name_hub,
-                 do_training
+                 do_training,
+                 ds_intermediate
                  ):
 
     print(transformer_model)
@@ -176,7 +178,8 @@ def run_training(data_path,
             train_identifier=train_regex,
             val_identifier=val_regex,
             test_identifier=test_regex,
-            seed=_seed
+            seed=_seed,
+            ds_intermediate=ds_intermediate
         )
 
         # copy data after preparation in case training fails, then we can start off from previous run
